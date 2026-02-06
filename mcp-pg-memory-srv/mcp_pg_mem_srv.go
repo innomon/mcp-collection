@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -38,71 +39,68 @@ type LabelCount struct {
 	Count int    `json:"count"`
 }
 
-// --- Database Client using MCP ---
+// --- Database Client using pgx ---
 
 type DBClient struct {
-	session *mcp.ClientSession
+	pool *pgxpool.Pool
 }
 
-func NewDBClient(ctx context.Context, toolboxCmd string) (*DBClient, error) {
-	parts := strings.Fields(toolboxCmd)
-	if len(parts) == 0 {
-		return nil, fmt.Errorf("empty toolbox command")
-	}
-
-	client := mcp.NewClient(&mcp.Implementation{
-		Name:    "memory-server-db-client",
-		Version: "1.0.0",
-	}, nil)
-
-	transport := &mcp.CommandTransport{
-		Command: exec.Command(parts[0], parts[1:]...),
-	}
-
-	session, err := client.Connect(ctx, transport, nil)
+func NewDBClient(ctx context.Context, connString string) (*DBClient, error) {
+	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
-		return nil, fmt.Errorf("connect to toolbox: %w", err)
+		return nil, fmt.Errorf("connect to postgres: %w", err)
 	}
 
-	return &DBClient{session: session}, nil
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping postgres: %w", err)
+	}
+
+	return &DBClient{pool: pool}, nil
 }
 
-func (c *DBClient) Close() error {
-	return c.session.Close()
+func (c *DBClient) Close() {
+	c.pool.Close()
 }
 
-func (c *DBClient) ExecuteSQL(ctx context.Context, sql string) ([]map[string]any, error) {
-	result, err := c.session.CallTool(ctx, &mcp.CallToolParams{
-		Name:      "execute_sql",
-		Arguments: map[string]any{"sql": sql},
-	})
+func scanMemory(row pgx.Row) (Memory, error) {
+	var mem Memory
+	var propsJSON []byte
+	var createdAt, updatedAt *string
+	err := row.Scan(&mem.ID, &mem.Label, &mem.Name, &propsJSON, &createdAt, &updatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("call execute_sql: %w", err)
+		return Memory{}, err
 	}
+	if len(propsJSON) > 0 {
+		json.Unmarshal(propsJSON, &mem.Properties)
+	}
+	if createdAt != nil {
+		mem.CreatedAt = *createdAt
+	}
+	if updatedAt != nil {
+		mem.UpdatedAt = *updatedAt
+	}
+	return mem, nil
+}
 
-	if result.IsError {
-		if len(result.Content) > 0 {
-			if tc, ok := result.Content[0].(*mcp.TextContent); ok {
-				return nil, fmt.Errorf("SQL error: %s", tc.Text)
-			}
-		}
-		return nil, fmt.Errorf("SQL execution failed")
+func scanConnection(row pgx.Row) (Connection, error) {
+	var conn Connection
+	var propsJSON []byte
+	var createdAt, updatedAt *string
+	err := row.Scan(&conn.ID, &conn.FromMemoryID, &conn.ToMemoryID, &conn.RelationshipType, &propsJSON, &createdAt, &updatedAt)
+	if err != nil {
+		return Connection{}, err
 	}
-
-	if len(result.Content) == 0 {
-		return nil, nil
+	if len(propsJSON) > 0 {
+		json.Unmarshal(propsJSON, &conn.Properties)
 	}
-
-	tc, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		return nil, nil
+	if createdAt != nil {
+		conn.CreatedAt = *createdAt
 	}
-
-	var rows []map[string]any
-	if err := json.Unmarshal([]byte(tc.Text), &rows); err != nil {
-		return nil, nil
+	if updatedAt != nil {
+		conn.UpdatedAt = *updatedAt
 	}
-	return rows, nil
+	return conn, nil
 }
 
 // --- Manager Logic ---
@@ -117,17 +115,20 @@ func NewMemoryManager(db *DBClient) *MemoryManager {
 
 func (m *MemoryManager) SearchMemories(ctx context.Context, input SearchMemoriesInput) (*SearchMemoriesOutput, error) {
 	var conditions []string
-	var joins []string
+	var args []any
+	argIdx := 1
 
 	if input.Query != "" {
 		words := strings.Fields(input.Query)
 		var wordConditions []string
 		for _, word := range words {
-			escapedWord := escapeSQLString(strings.ToLower(word))
+			pattern := "%" + strings.ToLower(word) + "%"
 			wordConditions = append(wordConditions, fmt.Sprintf(
-				`(LOWER(m.name) LIKE '%%%s%%' OR LOWER(m.label) LIKE '%%%s%%' OR LOWER(COALESCE(m.properties::text, '')) LIKE '%%%s%%')`,
-				escapedWord, escapedWord, escapedWord,
+				`(LOWER(m.name) LIKE $%d OR LOWER(m.label) LIKE $%d OR LOWER(COALESCE(m.properties::text, '')) LIKE $%d)`,
+				argIdx, argIdx, argIdx,
 			))
+			args = append(args, pattern)
+			argIdx++
 		}
 		if len(wordConditions) > 0 {
 			conditions = append(conditions, "("+strings.Join(wordConditions, " OR ")+")")
@@ -135,11 +136,15 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, input SearchMemories
 	}
 
 	if input.Label != "" {
-		conditions = append(conditions, fmt.Sprintf("LOWER(m.label) = '%s'", escapeSQLString(strings.ToLower(input.Label))))
+		conditions = append(conditions, fmt.Sprintf("LOWER(m.label) = $%d", argIdx))
+		args = append(args, strings.ToLower(input.Label))
+		argIdx++
 	}
 
 	if input.SinceDate != "" {
-		conditions = append(conditions, fmt.Sprintf("m.created_at >= '%s'", escapeSQLString(input.SinceDate)))
+		conditions = append(conditions, fmt.Sprintf("m.created_at >= $%d", argIdx))
+		args = append(args, input.SinceDate)
+		argIdx++
 	}
 
 	whereClause := ""
@@ -147,14 +152,10 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, input SearchMemories
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	joinClause := ""
-	if len(joins) > 0 {
-		joinClause = strings.Join(joins, " ")
-	}
-
 	orderBy := "m.created_at DESC"
-	if input.SortBy != "" {
-		orderBy = fmt.Sprintf("m.%s", escapeSQLString(input.SortBy))
+	allowedSorts := map[string]bool{"created_at": true, "name": true, "label": true}
+	if input.SortBy != "" && allowedSorts[input.SortBy] {
+		orderBy = "m." + input.SortBy
 	}
 
 	limit := 50
@@ -162,25 +163,32 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, input SearchMemories
 		limit = input.Limit
 	}
 
-	sql := fmt.Sprintf(
-		`SELECT DISTINCT m.id, m.label, m.name, m.properties, m.created_at, m.updated_at
-		 FROM memories m %s %s
+	query := fmt.Sprintf(
+		`SELECT DISTINCT m.id, m.label, m.name, m.properties, m.created_at::text, m.updated_at::text
+		 FROM memories m %s
 		 ORDER BY %s
 		 LIMIT %d`,
-		joinClause, whereClause, orderBy, limit,
+		whereClause, orderBy, limit,
 	)
 
-	rows, err := m.db.ExecuteSQL(ctx, sql)
+	rows, err := m.db.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("search memories: %w", err)
 	}
+	defer rows.Close()
 
 	var memories []Memory
 	memoryIDs := make(map[string]bool)
-	for _, row := range rows {
-		mem := rowToMemory(row)
+	for rows.Next() {
+		mem, err := scanMemory(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan memory: %w", err)
+		}
 		memories = append(memories, mem)
 		memoryIDs[mem.ID] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate memories: %w", err)
 	}
 
 	var connections []Connection
@@ -195,66 +203,50 @@ func (m *MemoryManager) SearchMemories(ctx context.Context, input SearchMemories
 }
 
 func (m *MemoryManager) CreateMemory(ctx context.Context, input CreateMemoryInput) (*Memory, error) {
-	propsJSON := "{}"
+	propsJSON := []byte("{}")
 	if input.Properties != nil {
 		b, err := json.Marshal(input.Properties)
 		if err != nil {
 			return nil, fmt.Errorf("marshal properties: %w", err)
 		}
-		propsJSON = string(b)
+		propsJSON = b
 	}
 
-	sql := fmt.Sprintf(
-		`INSERT INTO memories (label, name, properties) VALUES ('%s', '%s', '%s') RETURNING id, label, name, properties, created_at, updated_at`,
-		escapeSQLString(strings.ToLower(input.Label)),
-		escapeSQLString(input.Name),
-		escapeSQLString(propsJSON),
+	row := m.db.pool.QueryRow(ctx,
+		`INSERT INTO memories (label, name, properties) VALUES ($1, $2, $3)
+		 RETURNING id, label, name, properties, created_at::text, updated_at::text`,
+		strings.ToLower(input.Label), input.Name, propsJSON,
 	)
 
-	rows, err := m.db.ExecuteSQL(ctx, sql)
+	mem, err := scanMemory(row)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create memory: %w", err)
 	}
-
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("failed to create memory")
-	}
-
-	mem := rowToMemory(rows[0])
 	return &mem, nil
 }
 
 func (m *MemoryManager) CreateConnection(ctx context.Context, input CreateConnectionInput) (*Connection, error) {
-	propsJSON := "{}"
+	propsJSON := []byte("{}")
 	if input.Properties != nil {
 		b, err := json.Marshal(input.Properties)
 		if err != nil {
 			return nil, fmt.Errorf("marshal properties: %w", err)
 		}
-		propsJSON = string(b)
+		propsJSON = b
 	}
 
-	sql := fmt.Sprintf(
+	row := m.db.pool.QueryRow(ctx,
 		`INSERT INTO connections (from_memory_id, to_memory_id, relationship_type, properties)
-		 VALUES ('%s', '%s', '%s', '%s')
+		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (from_memory_id, to_memory_id, relationship_type) DO UPDATE SET properties = EXCLUDED.properties, updated_at = NOW()
-		 RETURNING id, from_memory_id, to_memory_id, relationship_type, properties, created_at, updated_at`,
-		escapeSQLString(input.FromMemoryID),
-		escapeSQLString(input.ToMemoryID),
-		escapeSQLString(strings.ToUpper(input.RelationshipType)),
-		escapeSQLString(propsJSON),
+		 RETURNING id, from_memory_id, to_memory_id, relationship_type, properties, created_at::text, updated_at::text`,
+		input.FromMemoryID, input.ToMemoryID, strings.ToUpper(input.RelationshipType), propsJSON,
 	)
 
-	rows, err := m.db.ExecuteSQL(ctx, sql)
+	conn, err := scanConnection(row)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create connection: %w", err)
 	}
-
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("failed to create connection")
-	}
-
-	conn := rowToConnection(rows[0])
 	return &conn, nil
 }
 
@@ -263,23 +255,18 @@ func (m *MemoryManager) UpdateMemory(ctx context.Context, input UpdateMemoryInpu
 		return nil, fmt.Errorf("no properties to update")
 	}
 
-	currentSQL := fmt.Sprintf(`SELECT properties FROM memories WHERE id = '%s'`, escapeSQLString(input.ID))
-	currentRows, err := m.db.ExecuteSQL(ctx, currentSQL)
+	var currentPropsJSON []byte
+	err := m.db.pool.QueryRow(ctx, `SELECT properties FROM memories WHERE id = $1`, input.ID).Scan(&currentPropsJSON)
 	if err != nil {
-		return nil, err
-	}
-	if len(currentRows) == 0 {
-		return nil, fmt.Errorf("memory not found: %s", input.ID)
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("memory not found: %s", input.ID)
+		}
+		return nil, fmt.Errorf("fetch memory: %w", err)
 	}
 
 	currentProps := make(map[string]any)
-	if propsRaw, ok := currentRows[0]["properties"]; ok {
-		switch v := propsRaw.(type) {
-		case map[string]any:
-			currentProps = v
-		case string:
-			json.Unmarshal([]byte(v), &currentProps)
-		}
+	if len(currentPropsJSON) > 0 {
+		json.Unmarshal(currentPropsJSON, &currentProps)
 	}
 
 	for k, v := range input.Properties {
@@ -290,27 +277,24 @@ func (m *MemoryManager) UpdateMemory(ctx context.Context, input UpdateMemoryInpu
 		}
 	}
 
-	propsJSON, err := json.Marshal(currentProps)
+	mergedJSON, err := json.Marshal(currentProps)
 	if err != nil {
 		return nil, fmt.Errorf("marshal properties: %w", err)
 	}
 
-	sql := fmt.Sprintf(
-		`UPDATE memories SET properties = '%s', updated_at = NOW() WHERE id = '%s' RETURNING id, label, name, properties, created_at, updated_at`,
-		escapeSQLString(string(propsJSON)),
-		escapeSQLString(input.ID),
+	row := m.db.pool.QueryRow(ctx,
+		`UPDATE memories SET properties = $1, updated_at = NOW() WHERE id = $2
+		 RETURNING id, label, name, properties, created_at::text, updated_at::text`,
+		mergedJSON, input.ID,
 	)
 
-	rows, err := m.db.ExecuteSQL(ctx, sql)
+	mem, err := scanMemory(row)
 	if err != nil {
-		return nil, err
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("memory not found: %s", input.ID)
+		}
+		return nil, fmt.Errorf("update memory: %w", err)
 	}
-
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("memory not found: %s", input.ID)
-	}
-
-	mem := rowToMemory(rows[0])
 	return &mem, nil
 }
 
@@ -319,23 +303,18 @@ func (m *MemoryManager) UpdateConnection(ctx context.Context, input UpdateConnec
 		return nil, fmt.Errorf("no properties to update")
 	}
 
-	currentSQL := fmt.Sprintf(`SELECT properties FROM connections WHERE id = '%s'`, escapeSQLString(input.ID))
-	currentRows, err := m.db.ExecuteSQL(ctx, currentSQL)
+	var currentPropsJSON []byte
+	err := m.db.pool.QueryRow(ctx, `SELECT properties FROM connections WHERE id = $1`, input.ID).Scan(&currentPropsJSON)
 	if err != nil {
-		return nil, err
-	}
-	if len(currentRows) == 0 {
-		return nil, fmt.Errorf("connection not found: %s", input.ID)
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("connection not found: %s", input.ID)
+		}
+		return nil, fmt.Errorf("fetch connection: %w", err)
 	}
 
 	currentProps := make(map[string]any)
-	if propsRaw, ok := currentRows[0]["properties"]; ok {
-		switch v := propsRaw.(type) {
-		case map[string]any:
-			currentProps = v
-		case string:
-			json.Unmarshal([]byte(v), &currentProps)
-		}
+	if len(currentPropsJSON) > 0 {
+		json.Unmarshal(currentPropsJSON, &currentProps)
 	}
 
 	for k, v := range input.Properties {
@@ -346,61 +325,59 @@ func (m *MemoryManager) UpdateConnection(ctx context.Context, input UpdateConnec
 		}
 	}
 
-	propsJSON, err := json.Marshal(currentProps)
+	mergedJSON, err := json.Marshal(currentProps)
 	if err != nil {
 		return nil, fmt.Errorf("marshal properties: %w", err)
 	}
 
-	sql := fmt.Sprintf(
-		`UPDATE connections SET properties = '%s', updated_at = NOW() WHERE id = '%s' RETURNING id, from_memory_id, to_memory_id, relationship_type, properties, created_at, updated_at`,
-		escapeSQLString(string(propsJSON)),
-		escapeSQLString(input.ID),
+	row := m.db.pool.QueryRow(ctx,
+		`UPDATE connections SET properties = $1, updated_at = NOW() WHERE id = $2
+		 RETURNING id, from_memory_id, to_memory_id, relationship_type, properties, created_at::text, updated_at::text`,
+		mergedJSON, input.ID,
 	)
 
-	rows, err := m.db.ExecuteSQL(ctx, sql)
+	conn, err := scanConnection(row)
 	if err != nil {
-		return nil, err
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("connection not found: %s", input.ID)
+		}
+		return nil, fmt.Errorf("update connection: %w", err)
 	}
-
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("connection not found: %s", input.ID)
-	}
-
-	conn := rowToConnection(rows[0])
 	return &conn, nil
 }
 
 func (m *MemoryManager) DeleteMemory(ctx context.Context, id string) error {
-	sql := fmt.Sprintf(`DELETE FROM memories WHERE id = '%s'`, escapeSQLString(id))
-	_, err := m.db.ExecuteSQL(ctx, sql)
-	return err
+	_, err := m.db.pool.Exec(ctx, `DELETE FROM memories WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete memory: %w", err)
+	}
+	return nil
 }
 
 func (m *MemoryManager) DeleteConnection(ctx context.Context, id string) error {
-	sql := fmt.Sprintf(`DELETE FROM connections WHERE id = '%s'`, escapeSQLString(id))
-	_, err := m.db.ExecuteSQL(ctx, sql)
-	return err
+	_, err := m.db.pool.Exec(ctx, `DELETE FROM connections WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete connection: %w", err)
+	}
+	return nil
 }
 
 func (m *MemoryManager) ListMemoryLabels(ctx context.Context) ([]LabelCount, error) {
-	sql := `SELECT label, COUNT(*) as count FROM memories GROUP BY label ORDER BY count DESC`
-	rows, err := m.db.ExecuteSQL(ctx, sql)
+	rows, err := m.db.pool.Query(ctx, `SELECT label, COUNT(*) as count FROM memories GROUP BY label ORDER BY count DESC`)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list labels: %w", err)
 	}
+	defer rows.Close()
 
 	var labels []LabelCount
-	for _, row := range rows {
-		label := getString(row, "label")
-		count := 0
-		if c, ok := row["count"].(float64); ok {
-			count = int(c)
-		} else if c, ok := row["count"].(int); ok {
-			count = c
+	for rows.Next() {
+		var lc LabelCount
+		if err := rows.Scan(&lc.Label, &lc.Count); err != nil {
+			return nil, fmt.Errorf("scan label: %w", err)
 		}
-		labels = append(labels, LabelCount{Label: label, Count: count})
+		labels = append(labels, lc)
 	}
-	return labels, nil
+	return labels, rows.Err()
 }
 
 func (m *MemoryManager) loadConnectionsForMemories(ctx context.Context, memoryIDs map[string]bool, depth int) ([]Connection, error) {
@@ -408,92 +385,34 @@ func (m *MemoryManager) loadConnectionsForMemories(ctx context.Context, memoryID
 		return nil, nil
 	}
 
-	idList := make([]string, 0, len(memoryIDs))
+	ids := make([]string, 0, len(memoryIDs))
 	for id := range memoryIDs {
-		idList = append(idList, fmt.Sprintf("'%s'", escapeSQLString(id)))
+		ids = append(ids, id)
 	}
-	idIn := strings.Join(idList, ",")
 
-	sql := fmt.Sprintf(
-		`SELECT id, from_memory_id, to_memory_id, relationship_type, properties, created_at, updated_at
+	rows, err := m.db.pool.Query(ctx,
+		`SELECT id, from_memory_id, to_memory_id, relationship_type, properties, created_at::text, updated_at::text
 		 FROM connections
-		 WHERE from_memory_id IN (%s) OR to_memory_id IN (%s)`,
-		idIn, idIn,
+		 WHERE from_memory_id = ANY($1) OR to_memory_id = ANY($1)`,
+		ids,
 	)
-
-	rows, err := m.db.ExecuteSQL(ctx, sql)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load connections: %w", err)
 	}
+	defer rows.Close()
 
 	var connections []Connection
-	for _, row := range rows {
-		connections = append(connections, rowToConnection(row))
-	}
-	return connections, nil
-}
-
-// --- Helpers ---
-
-func escapeSQLString(s string) string {
-	return strings.ReplaceAll(s, "'", "''")
-}
-
-func getString(row map[string]any, key string) string {
-	if v, ok := row[key].(string); ok {
-		return v
-	}
-	return ""
-}
-
-func rowToMemory(row map[string]any) Memory {
-	mem := Memory{
-		ID:        getString(row, "id"),
-		Label:     getString(row, "label"),
-		Name:      getString(row, "name"),
-		CreatedAt: getString(row, "created_at"),
-		UpdatedAt: getString(row, "updated_at"),
-	}
-
-	if propsRaw, ok := row["properties"]; ok {
-		switch v := propsRaw.(type) {
-		case map[string]any:
-			mem.Properties = v
-		case string:
-			var props map[string]any
-			if err := json.Unmarshal([]byte(v), &props); err == nil {
-				mem.Properties = props
-			}
+	for rows.Next() {
+		conn, err := scanConnection(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan connection: %w", err)
 		}
+		connections = append(connections, conn)
 	}
-
-	return mem
+	return connections, rows.Err()
 }
 
-func rowToConnection(row map[string]any) Connection {
-	conn := Connection{
-		ID:               getString(row, "id"),
-		FromMemoryID:     getString(row, "from_memory_id"),
-		ToMemoryID:       getString(row, "to_memory_id"),
-		RelationshipType: getString(row, "relationship_type"),
-		CreatedAt:        getString(row, "created_at"),
-		UpdatedAt:        getString(row, "updated_at"),
-	}
-
-	if propsRaw, ok := row["properties"]; ok {
-		switch v := propsRaw.(type) {
-		case map[string]any:
-			conn.Properties = v
-		case string:
-			var props map[string]any
-			if err := json.Unmarshal([]byte(v), &props); err == nil {
-				conn.Properties = props
-			}
-		}
-	}
-
-	return conn
-}
+// --- Guidance ---
 
 func getGuidance(topic string) string {
 	guidance := map[string]string{
@@ -655,14 +574,15 @@ var manager *MemoryManager
 func main() {
 	ctx := context.Background()
 
-	toolboxCmd := os.Getenv("TOOLBOX_MCP_CMD")
-	if toolboxCmd == "" {
-		toolboxCmd = "toolbox --tools-file tools.yaml"
+	connString := os.Getenv("DATABASE_URL")
+	if connString == "" {
+		fmt.Fprintf(os.Stderr, "DATABASE_URL environment variable is required\n")
+		os.Exit(1)
 	}
 
-	dbClient, err := NewDBClient(ctx, toolboxCmd)
+	dbClient, err := NewDBClient(ctx, connString)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect to database MCP server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to connect to PostgreSQL: %v\n", err)
 		os.Exit(1)
 	}
 	defer dbClient.Close()

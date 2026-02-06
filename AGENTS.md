@@ -7,11 +7,11 @@
 
 ## Architecture
 Monorepo of independent Go MCP (Model Context Protocol) servers, each with its own `go.mod`. All use `github.com/modelcontextprotocol/go-sdk/mcp`.
-- **mcp-pg-memory-srv** — Knowledge graph memory server over PostgreSQL (Streamable HTTP transport). Acts as both MCP server and MCP client (connects to genai-toolbox for DB access via `mcp.CommandTransport`).
+- **mcp-pg-memory-srv** — Knowledge graph memory server over PostgreSQL (Streamable HTTP transport). Connects directly to PostgreSQL via `pgx/v5` connection pool. Env: `DATABASE_URL`, `MCP_PORT`.
 - **mcp2mcp-mem-srv** — Similar memory server variant (same pattern, uses toolbox + `tools.yaml` for Postgres).
 - **mcp-frappe** — Frappe ERP MCP server (stdio transport). CRUD operations against Frappe REST API.
 
-DB schema: `memories` (nodes) and `connections` (edges) tables in PostgreSQL. SQL is built via string formatting with `escapeSQLString` for escaping.
+DB schema: `memories` (nodes) and `connections` (edges) tables in PostgreSQL. `mcp-pg-memory-srv` uses parameterized queries (`$1`, `$2`, …) via `pgx`. `mcp2mcp-mem-srv` uses string formatting with `escapeSQLString`.
 
 ## Code Style
 - Go 1.25+, single-file `package main` servers, no tests currently.
@@ -19,4 +19,7 @@ DB schema: `memories` (nodes) and `connections` (edges) tables in PostgreSQL. SQ
 - Tool registration: `mcp.AddTool(server, &mcp.Tool{...}, handlerFunc)` with typed input structs.
 - Errors: wrap with `fmt.Errorf("context: %w", err)`, return early on error.
 - Naming: PascalCase types/exports, camelCase locals. Input/Output suffix for tool IO structs.
-- Config via env vars (`os.Getenv`). No external config files except `tools.yaml` for toolbox.
+- Config via env vars (`os.Getenv`). `mcp2mcp-mem-srv` uses `tools.yaml` for toolbox config.
+
+## Documentation
+- update README.md and AGENTS.md after changes are made & accepted.

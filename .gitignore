@@ -1,0 +1,12 @@
+# Go binaries (module names)
+mpcpgmem
+mcp2mcpmem
+mcpfrp
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
