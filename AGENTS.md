@@ -1,0 +1,22 @@
+# AGENTS.md
+
+## Commands
+- Build a subproject: `cd <subproject> && go build .`
+- Run a single test: `cd <subproject> && go test -run TestName -v ./...`
+- Vet/lint: `cd <subproject> && go vet ./...`
+
+## Architecture
+Monorepo of independent Go MCP (Model Context Protocol) servers, each with its own `go.mod`. All use `github.com/modelcontextprotocol/go-sdk/mcp`.
+- **mcp-pg-memory-srv** — Knowledge graph memory server over PostgreSQL (Streamable HTTP transport). Acts as both MCP server and MCP client (connects to genai-toolbox for DB access via `mcp.CommandTransport`).
+- **mcp2mcp-mem-srv** — Similar memory server variant (same pattern, uses toolbox + `tools.yaml` for Postgres).
+- **mcp-frappe** — Frappe ERP MCP server (stdio transport). CRUD operations against Frappe REST API.
+
+DB schema: `memories` (nodes) and `connections` (edges) tables in PostgreSQL. SQL is built via string formatting with `escapeSQLString` for escaping.
+
+## Code Style
+- Go 1.25+, single-file `package main` servers, no tests currently.
+- Struct tags: `json` for serialization, `jsonschema:"description=..."` for MCP tool schema generation.
+- Tool registration: `mcp.AddTool(server, &mcp.Tool{...}, handlerFunc)` with typed input structs.
+- Errors: wrap with `fmt.Errorf("context: %w", err)`, return early on error.
+- Naming: PascalCase types/exports, camelCase locals. Input/Output suffix for tool IO structs.
+- Config via env vars (`os.Getenv`). No external config files except `tools.yaml` for toolbox.
