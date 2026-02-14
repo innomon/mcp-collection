@@ -1,0 +1,8 @@
+{
+  "track_id": "mcp_server_core_20260214",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-14T00:00:00Z",
+  "updated_at": "2026-02-14T00:00:00Z",
+  "description": "Implement the core MCP server functionalities, including secure authentication, product discovery, order history, checkout, and issue reporting, to establish a fully functional bridge between an AI Agent and a WooCommerce store."
+}

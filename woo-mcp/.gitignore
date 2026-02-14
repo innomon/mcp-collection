@@ -1,0 +1,32 @@
+# Binaries for programs and plugins
+*.exe
+*.darwin-amd64
+*.darwin-arm64
+*.linux-amd64
+*.linux-arm64
+*.windows-amd64
+
+# Test binary, generated with `go test -c`
+*.test
+
+# Output of the go toolchain
+.cache/
+.vscode/
+
+# IDE specific files
+.idea/
+
+# Environment variables
+.env
+.env.*
+
+# Local development
+/tmp/
+
+# Build outputs
+/build/
+/dist/
+
+# Dependencies
+/vendor/
+/go.sum

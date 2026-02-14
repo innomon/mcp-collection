@@ -1,0 +1,15 @@
+# WooCommerce MCP Server Configuration
+
+# WooCommerce store base URL
+store_url: "https://your-store.example.com"
+
+# WooCommerce REST API credentials
+consumer_key: "ck_your_consumer_key"
+consumer_secret: "cs_your_consumer_secret"
+
+# Path to RSA public key PEM file for JWT verification
+public_key_path: "/path/to/public_key.pem"
+
+# MCP server identification (optional, defaults shown)
+server_name: "WooCommerce-MCP"
+server_version: "1.0.0"
