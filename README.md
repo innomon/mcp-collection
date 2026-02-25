@@ -18,9 +18,27 @@ Similar memory server variant that uses genai-toolbox + `tools.yaml` for Postgre
 
 ### mcp-frappe
 
-Frappe ERP MCP server. CRUD operations against Frappe REST API.
+Frappe ERP MCP server with CRUD and DocType contract tooling.
 
-- **Transport**: stdio
+- **Transports**: `stdio` (default) and `sse` (configurable)
+- **Core tools**:
+  - `frappe_search`
+  - `frappe_get_record`
+  - `frappe_create_record`
+  - `frappe_update_record`
+  - `frappe_delete_record` (feature-flagged and policy-gated)
+- **DocType tools** (feature-flagged):
+  - `frappe_get_doctype_meta`
+  - `frappe_generate_doctype_json`
+  - `frappe_validate_doctype_json`
+- **Key env vars**:
+  - `FRAPPE_BASE_URL` (or legacy `FRAPPE_URL`), `FRAPPE_API_KEY`, `FRAPPE_API_SECRET`
+  - `FRAPPE_TIMEOUT_MS`
+  - `FRAPPE_MCP_TRANSPORT` (`stdio` or `sse`)
+  - `FRAPPE_MCP_SSE_HOST`, `FRAPPE_MCP_SSE_PORT`, `FRAPPE_MCP_SSE_PATH` (required in `sse` mode)
+  - `FRAPPE_MCP_ENABLE_DELETE`, `FRAPPE_MCP_ENABLE_DOCTYPE_GEN`
+  - `FRAPPE_ALLOWED_DOCTYPES`
+  - `FRAPPE_ENV`, `FRAPPE_MCP_DELETE_APPROVAL_TOKEN`
 
 ## Database Schema
 
