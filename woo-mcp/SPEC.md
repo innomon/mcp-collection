@@ -416,7 +416,7 @@ _Goal: UCP data model + richer product search matching Shopify Storefront MCP_
   - [x] `get_product_categories` tool
   - [x] `search_shop_policies_and_faqs` tool (query WP pages)
 - [x] **1.4** Update config
-  - [x] Add `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled` fields
+  - [x] Add `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`, `super_user` fields
   - [x] Update `config.yaml.example`
 - [x] **1.5** Refactor `tools.go` → register both legacy and UCP tools
 - [x] **1.6** Tests for Phase 1
@@ -617,6 +617,28 @@ The platform discovers OAuth metadata, redirects the buyer to the login form, th
 - Persistent token storage for multi-instance deployments
 - Scope enforcement: gate each checkout/order operation on the token's granted scopes
 - Order history scoping: filter `list_orders` to the authenticated customer only
+
+### Super User Mode (`super_user: true`)
+
+Two operational modes control how the server handles authentication on REST endpoints:
+
+| Mode | Config | Use Case | Auth Behavior |
+|------|--------|----------|---------------|
+| **Customer-facing** (default) | `super_user: false` | AI shopping assistants, customer self-service | OAuth 2.0 tokens required for identity linking; OAuth endpoints registered |
+| **Super user** | `super_user: true` | Backend trusted processes, merchant admin tools | OAuth endpoints not registered; REST endpoints operate with full merchant-level access via WC consumer key/secret; no Bearer token required |
+
+In super user mode:
+- OAuth 2.0 endpoints (`/oauth2/*`, `/.well-known/oauth-authorization-server`) are **not registered**
+- REST endpoints (`/ucp/v1/*`) operate without requiring Bearer tokens
+- The WooClient's merchant-level consumer key/secret provides full access to all customer data
+- MCP tools via stdio/HTTP continue to work normally
+- `extractAuthenticatedEmail()` returns empty (no identity linking)
+
+In customer-facing mode (default):
+- OAuth 2.0 endpoints are registered when `oauth_clients` are configured
+- Bearer tokens from the OAuth flow carry `customerEmail` and `customerID`
+- `extractAuthenticatedEmail()` resolves the token to the linked customer email
+- Checkout operations pre-fill buyer info from the linked account
 
 ---
 

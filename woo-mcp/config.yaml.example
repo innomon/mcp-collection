@@ -26,6 +26,11 @@ ucp_enabled: true
 # Enable A2UI card rendering in tool responses
 a2ui_enabled: true
 
+# Super user mode: trusted backend process, skips OAuth token validation
+# for REST endpoints. Use for backend integrations with merchant-level access.
+# When false (default), customer-facing mode: OAuth required for identity linking.
+super_user: false
+
 # WordPress page IDs containing store policies (optional)
 store_policies_page_ids: []
 

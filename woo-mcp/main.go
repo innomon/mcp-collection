@@ -72,7 +72,11 @@ func main() {
 		defer ss.Close()
 	}
 
-	log.Printf("%s %s started (transport=%s)", cfg.ServerName, cfg.ServerVersion, cfg.Transport)
+	if cfg.SuperUser {
+		log.Printf("%s %s started (transport=%s, mode=super_user)", cfg.ServerName, cfg.ServerVersion, cfg.Transport)
+	} else {
+		log.Printf("%s %s started (transport=%s)", cfg.ServerName, cfg.ServerVersion, cfg.Transport)
+	}
 
 	<-ctx.Done()
 	log.Println("server shut down")

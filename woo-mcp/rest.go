@@ -22,8 +22,8 @@ func (rs *RESTServer) RegisterRoutes(mux *http.ServeMux) {
 	// UCP Profile
 	mux.HandleFunc("GET /.well-known/ucp", handleUCPProfile(rs.cfg))
 
-	// OAuth 2.0 Identity Linking endpoints
-	if rs.oauth != nil {
+	// OAuth 2.0 Identity Linking endpoints (not registered in super_user mode)
+	if rs.oauth != nil && !rs.isSuperUser() {
 		mux.HandleFunc("GET /.well-known/oauth-authorization-server", rs.oauth.HandleMetadata)
 		mux.HandleFunc("GET /oauth2/authorize", rs.oauth.HandleAuthorize)
 		mux.HandleFunc("POST /oauth2/authorize", rs.oauth.HandleAuthorize)
@@ -60,6 +60,11 @@ func (rs *RESTServer) extractAuthenticatedEmail(r *http.Request) string {
 		return ""
 	}
 	return rec.customerEmail
+}
+
+// isSuperUser returns true when the server operates in trusted backend mode.
+func (rs *RESTServer) isSuperUser() bool {
+	return rs.cfg.SuperUser
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
