@@ -39,6 +39,11 @@ type Config struct {
 	AllowedDocTypes     map[string]struct{}
 	Environment         string
 	DeleteApprovalToken string
+	EnableA2UIPipeline  bool
+	ConfidenceThreshold float64
+	MaxCandidates       int
+	FallbackSchema      string
+	CacheTTLSec         int
 }
 
 type FrappeClient struct {
@@ -171,6 +176,16 @@ type UpdateRecordArgs struct {
 	UpdateJSON map[string]any `json:"update_json" jsonschema:"description=The fields to update"`
 }
 
+type MapDocTypeToCandidatesArgs struct {
+	DocType string `json:"doctype" jsonschema:"description=The Frappe DocType to map to schema candidates"`
+}
+
+type SelectSchemaArgs struct {
+	DocType          string            `json:"doctype" jsonschema:"description=The Frappe DocType to use for candidate generation"`
+	Content          string            `json:"content" jsonschema:"description=The agent response content to select a schema for"`
+	StaticCandidates []SchemaCandidate `json:"static_candidates,omitempty" jsonschema:"description=Optional static schema candidates to merge with DocType-derived candidates"`
+}
+
 func main() {
 	cfg, err := loadConfigFromEnv()
 	if err != nil {
@@ -193,7 +208,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	log.Printf("frappe-mcp starting transport=%s doctype_gen_enabled=%t delete_enabled=%t", cfg.Transport, cfg.EnableDocTypeGen, cfg.EnableDelete)
+	log.Printf("frappe-mcp starting transport=%s doctype_gen_enabled=%t delete_enabled=%t a2ui_pipeline_enabled=%t", cfg.Transport, cfg.EnableDocTypeGen, cfg.EnableDelete, cfg.EnableA2UIPipeline)
 
 	if err := runServer(ctx, server, cfg); err != nil {
 		log.Fatalf("server failed: %v", err)
@@ -442,6 +457,89 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 		}
 		return nil, validateDocTypeJSON(args.DocTypeJSON), nil
 	})
+
+	if !cfg.EnableA2UIPipeline {
+		return
+	}
+
+	dtCache := NewDocTypeCache(time.Duration(cfg.CacheTTLSec) * time.Second)
+	mc := NewMetricsCollector()
+
+	fetchDocType := func(ctx context.Context, docType string) (*FrappeDocType, error) {
+		if dt, ok := dtCache.Get(docType); ok {
+			mc.IncCounter(metricDocTypeCacheHitTotal, nil)
+			return dt, nil
+		}
+		mc.IncCounter(metricDocTypeCacheMissTotal, nil)
+		mc.IncCounter(metricDocTypeFetchTotal, nil)
+		meta, err := getDocTypeMeta(ctx, client, docType)
+		if err != nil {
+			return nil, err
+		}
+		dt := metaToFrappeDocType(docType, meta)
+		dtCache.Set(docType, dt)
+		return dt, nil
+	}
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "frappe_map_doctype_to_candidates",
+		Description: "Fetch DocType metadata and return derived A2UI schema candidates",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args MapDocTypeToCandidatesArgs) (*mcp.CallToolResult, ToolResponse, error) {
+		docType, ok := validateName(args.DocType)
+		if !ok {
+			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
+		}
+		if !isDocTypeAllowed(cfg.AllowedDocTypes, docType) {
+			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
+		}
+
+		dt, err := fetchDocType(ctx, docType)
+		if err != nil {
+			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
+		}
+
+		candidates := DocTypeToCandidates([]FrappeDocType{*dt})
+		return nil, ToolResponse{Data: map[string]any{"candidates": candidates}}, nil
+	})
+
+	pipelineCfg := PipelineConfig{
+		ConfidenceThreshold: cfg.ConfidenceThreshold,
+		FallbackSchema:      cfg.FallbackSchema,
+		MaxCandidates:       cfg.MaxCandidates,
+	}
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "frappe_select_schema",
+		Description: "Run the full A2UI schema selection pipeline: fetch DocType, map candidates, merge with static, select best schema",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args SelectSchemaArgs) (*mcp.CallToolResult, ToolResponse, error) {
+		docType, ok := validateName(args.DocType)
+		if !ok {
+			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
+		}
+		if !isDocTypeAllowed(cfg.AllowedDocTypes, docType) {
+			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
+		}
+
+		dt, err := fetchDocType(ctx, docType)
+		if err != nil {
+			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
+		}
+
+		dtCandidates := DocTypeToCandidates([]FrappeDocType{*dt})
+		maxC := pipelineCfg.MaxCandidates
+		if maxC <= 0 {
+			maxC = defaultMaxCandidates
+		}
+		merged := mergeCandidates(args.StaticCandidates, dtCandidates, maxC)
+
+		selector := &DefaultSelector{}
+		result, err := runPipeline(ctx, merged, args.Content, selector, pipelineCfg, mc)
+		if err != nil {
+			return toolError("pipeline_failed", err.Error()), ToolResponse{}, nil
+		}
+
+		return nil, ToolResponse{Data: result}, nil
+	})
 }
 
 func loadConfigFromEnv() (Config, error) {
@@ -472,6 +570,11 @@ func loadConfigFromEnv() (Config, error) {
 		AllowedDocTypes:     parseAllowlist(os.Getenv("FRAPPE_ALLOWED_DOCTYPES")),
 		Environment:         strings.ToLower(strings.TrimSpace(defaultValue(os.Getenv("FRAPPE_ENV"), os.Getenv("APP_ENV")))),
 		DeleteApprovalToken: strings.TrimSpace(os.Getenv("FRAPPE_MCP_DELETE_APPROVAL_TOKEN")),
+		EnableA2UIPipeline:  parseBool(os.Getenv("FRAPPE_MCP_ENABLE_A2UI_PIPELINE")),
+		ConfidenceThreshold: parseFloatWithDefault(os.Getenv("FRAPPE_MCP_CONFIDENCE_THRESHOLD"), 0.5),
+		MaxCandidates:       parseIntWithDefault(os.Getenv("FRAPPE_MCP_MAX_CANDIDATES"), 20),
+		FallbackSchema:      defaultValue(os.Getenv("FRAPPE_MCP_FALLBACK_SCHEMA"), "markdown"),
+		CacheTTLSec:         parseIntWithDefault(os.Getenv("FRAPPE_MCP_CACHE_TTL_SEC"), 300),
 	}
 
 	if cfg.BaseURL == "" || cfg.APIKey == "" || cfg.APISecret == "" {
@@ -489,6 +592,67 @@ func loadConfigFromEnv() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// metaToFrappeDocType converts raw Frappe metadata into the pipeline's FrappeDocType model.
+func metaToFrappeDocType(docType string, source map[string]any) *FrappeDocType {
+	docNode := source
+	if nested, ok := source["data"].(map[string]any); ok {
+		docNode = nested
+	}
+
+	name := asString(docNode["name"])
+	if name == "" {
+		name = docType
+	}
+
+	var fields []FrappeField
+	if rawFields, ok := docNode["fields"].([]any); ok {
+		for _, raw := range rawFields {
+			entry, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			f := FrappeField{
+				Fieldname: asString(entry["fieldname"]),
+				Label:     asString(entry["label"]),
+				Fieldtype: asString(entry["fieldtype"]),
+				Reqd:      asBool(entry["reqd"]),
+			}
+			options := strings.TrimSpace(asString(entry["options"]))
+			if options != "" {
+				f.Options = &options
+			}
+			fields = append(fields, f)
+		}
+	}
+
+	var permissions []FrappePermission
+	if rawPerms, ok := docNode["permissions"].([]any); ok {
+		for _, raw := range rawPerms {
+			entry, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			permissions = append(permissions, FrappePermission{
+				Role:   asString(entry["role"]),
+				Read:   asBool(entry["read"]),
+				Write:  asBool(entry["write"]),
+				Create: asBool(entry["create"]),
+				Delete: asBool(entry["delete"]),
+				Submit: asBool(entry["submit"]),
+			})
+		}
+	}
+
+	return &FrappeDocType{
+		Name:          name,
+		Module:        asString(docNode["module"]),
+		IsSubmittable: asBool(docNode["is_submittable"]),
+		Modified:      asString(docNode["modified"]),
+		Fields:        fields,
+		Permissions:   permissions,
+	}
 }
 
 func getDocTypeMeta(ctx context.Context, client *FrappeClient, docType string) (map[string]any, error) {
@@ -758,6 +922,18 @@ func parseBool(raw string) bool {
 		return false
 	}
 	return v
+}
+
+func parseFloatWithDefault(raw string, def float64) float64 {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return def
+	}
+	parsed, err := strconv.ParseFloat(v, 64)
+	if err != nil || parsed < 0 {
+		return def
+	}
+	return parsed
 }
 
 func parseIntWithDefault(raw string, defaultValue int) int {

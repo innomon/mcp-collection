@@ -31,12 +31,18 @@ Frappe ERP MCP server with CRUD and DocType contract tooling.
   - `frappe_get_doctype_meta`
   - `frappe_generate_doctype_json`
   - `frappe_validate_doctype_json`
+- **A2UI pipeline tools** (feature-flagged via `FRAPPE_MCP_ENABLE_A2UI_PIPELINE`):
+  - `frappe_map_doctype_to_candidates` — converts DocType metadata into A2UI schema candidates
+  - `frappe_select_schema` — runs the full schema selection pipeline (fetch → map → merge → select)
 - **Key env vars**:
   - `FRAPPE_BASE_URL` (or legacy `FRAPPE_URL`), `FRAPPE_API_KEY`, `FRAPPE_API_SECRET`
   - `FRAPPE_TIMEOUT_MS`
   - `FRAPPE_MCP_TRANSPORT` (`stdio` or `sse`)
   - `FRAPPE_MCP_SSE_HOST`, `FRAPPE_MCP_SSE_PORT`, `FRAPPE_MCP_SSE_PATH` (required in `sse` mode)
   - `FRAPPE_MCP_ENABLE_DELETE`, `FRAPPE_MCP_ENABLE_DOCTYPE_GEN`
+  - `FRAPPE_MCP_ENABLE_A2UI_PIPELINE` — enables A2UI schema pipeline tools
+  - `FRAPPE_MCP_CONFIDENCE_THRESHOLD` (default `0.5`), `FRAPPE_MCP_MAX_CANDIDATES` (default `20`)
+  - `FRAPPE_MCP_FALLBACK_SCHEMA` (default `markdown`), `FRAPPE_MCP_CACHE_TTL_SEC` (default `300`)
   - `FRAPPE_ALLOWED_DOCTYPES`
   - `FRAPPE_ENV`, `FRAPPE_MCP_DELETE_APPROVAL_TOKEN`
 
