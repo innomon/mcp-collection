@@ -67,6 +67,32 @@ func (rs *RESTServer) isSuperUser() bool {
 	return rs.cfg.SuperUser
 }
 
+// apiKeyMiddleware returns an HTTP middleware that validates requests against
+// the configured static API keys. Callers must provide the key via
+// "Authorization: Bearer <key>" or "X-API-Key: <key>" header.
+func apiKeyMiddleware(keys []string) func(http.Handler) http.Handler {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, k := range keys {
+		allowed[k] = struct{}{}
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			key := ""
+			if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+				key = strings.TrimPrefix(auth, "Bearer ")
+			}
+			if key == "" {
+				key = r.Header.Get("X-API-Key")
+			}
+			if _, ok := allowed[key]; !ok {
+				writeError(w, http.StatusUnauthorized, "unauthorized", "invalid or missing API key")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

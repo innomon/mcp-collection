@@ -31,6 +31,11 @@ a2ui_enabled: true
 # When false (default), customer-facing mode: OAuth required for identity linking.
 super_user: false
 
+# Static API keys for super_user mode (callers must pass via
+# "Authorization: Bearer <key>" or "X-API-Key: <key>" header)
+# api_keys:
+#   - "your-secret-api-key-here"
+
 # WordPress page IDs containing store policies (optional)
 store_policies_page_ids: []
 

@@ -474,3 +474,65 @@ func TestGetProductCategoriesTool(t *testing.T) {
 		t.Errorf("categories count = %d", len(cats))
 	}
 }
+
+// --- API Key Middleware Tests ---
+
+func TestAPIKeyMiddleware(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+	wrapped := apiKeyMiddleware([]string{"key-abc", "key-xyz"})(handler)
+	ts := httptest.NewServer(wrapped)
+	defer ts.Close()
+
+	t.Run("valid Bearer token", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.URL+"/test", nil)
+		req.Header.Set("Authorization", "Bearer key-abc")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status = %d, want 200", resp.StatusCode)
+		}
+	})
+
+	t.Run("valid X-API-Key", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.URL+"/test", nil)
+		req.Header.Set("X-API-Key", "key-xyz")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status = %d, want 200", resp.StatusCode)
+		}
+	})
+
+	t.Run("missing key", func(t *testing.T) {
+		resp, err := http.Get(ts.URL + "/test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("status = %d, want 401", resp.StatusCode)
+		}
+	})
+
+	t.Run("wrong key", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", ts.URL+"/test", nil)
+		req.Header.Set("Authorization", "Bearer wrong-key")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("status = %d, want 401", resp.StatusCode)
+		}
+	})
+}

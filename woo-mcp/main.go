@@ -52,7 +52,11 @@ func main() {
 		httpMux.Handle("/ucp/mcp", httpHandler)
 
 		addr := fmt.Sprintf(":%d", cfg.HTTPPort)
-		httpServer := &http.Server{Addr: addr, Handler: httpMux}
+		var handler http.Handler = httpMux
+		if cfg.SuperUser && len(cfg.APIKeys) > 0 {
+			handler = apiKeyMiddleware(cfg.APIKeys)(httpMux)
+		}
+		httpServer := &http.Server{Addr: addr, Handler: handler}
 
 		go func() {
 			log.Printf("HTTP server listening on %s", addr)

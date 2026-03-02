@@ -66,7 +66,8 @@ WooCommerce MCP+UCP server exposing WooCommerce capabilities via both MCP (for A
   - `GET /oauth2/authorize`, `POST /oauth2/token`, `POST /oauth2/revoke`
   - Bearer token auth on checkout REST endpoints pre-fills buyer info
 - **A2UI Cards**: Product, checkout, and order cards (when `a2ui_enabled: true`)
-- **Config**: `config.yaml` with `store_url`, `consumer_key`, `consumer_secret`, `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`, `oauth_clients`
+- **Super User Mode**: `super_user: true` enables trusted backend mode; `api_keys` list secures REST endpoints via `Authorization: Bearer <key>` or `X-API-Key` header
+- **Config**: `config.yaml` with `store_url`, `consumer_key`, `consumer_secret`, `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`, `super_user`, `api_keys`, `oauth_clients`
 
 ## Database Schema
 

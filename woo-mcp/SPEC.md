@@ -416,7 +416,7 @@ _Goal: UCP data model + richer product search matching Shopify Storefront MCP_
   - [x] `get_product_categories` tool
   - [x] `search_shop_policies_and_faqs` tool (query WP pages)
 - [x] **1.4** Update config
-  - [x] Add `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`, `super_user` fields
+  - [x] Add `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`, `super_user`, `api_keys` fields
   - [x] Update `config.yaml.example`
 - [x] **1.5** Refactor `tools.go` → register both legacy and UCP tools
 - [x] **1.6** Tests for Phase 1
@@ -625,13 +625,14 @@ Two operational modes control how the server handles authentication on REST endp
 | Mode | Config | Use Case | Auth Behavior |
 |------|--------|----------|---------------|
 | **Customer-facing** (default) | `super_user: false` | AI shopping assistants, customer self-service | OAuth 2.0 tokens required for identity linking; OAuth endpoints registered |
-| **Super user** | `super_user: true` | Backend trusted processes, merchant admin tools | OAuth endpoints not registered; REST endpoints operate with full merchant-level access via WC consumer key/secret; no Bearer token required |
+| **Super user** | `super_user: true` | Backend trusted processes, merchant admin tools | OAuth endpoints not registered; REST endpoints authenticated via static API keys (`api_keys` in config); WC consumer key/secret provides full merchant access |
 
 In super user mode:
 - OAuth 2.0 endpoints (`/oauth2/*`, `/.well-known/oauth-authorization-server`) are **not registered**
-- REST endpoints (`/ucp/v1/*`) operate without requiring Bearer tokens
-- The WooClient's merchant-level consumer key/secret provides full access to all customer data
-- MCP tools via stdio/HTTP continue to work normally
+- When `api_keys` is configured, all HTTP endpoints (REST + MCP) require a valid API key via `Authorization: Bearer <key>` or `X-API-Key: <key>` header; requests without a valid key receive a `401 Unauthorized` JSON error
+- When `api_keys` is empty/absent, REST endpoints operate without inbound authentication (suitable for localhost/firewall-only deployments)
+- The WooClient's merchant-level consumer key/secret provides full access to all customer data on outbound calls to WooCommerce
+- MCP tools via stdio continue to work normally (API key middleware only applies to HTTP)
 - `extractAuthenticatedEmail()` returns empty (no identity linking)
 
 In customer-facing mode (default):
