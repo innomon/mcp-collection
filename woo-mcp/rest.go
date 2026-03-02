@@ -11,15 +11,24 @@ import (
 type RESTServer struct {
 	client *WooClient
 	cfg    *Config
+	oauth  *OAuthServer
 }
 
-func NewRESTServer(client *WooClient, cfg *Config) *RESTServer {
-	return &RESTServer{client: client, cfg: cfg}
+func NewRESTServer(client *WooClient, cfg *Config, oauth *OAuthServer) *RESTServer {
+	return &RESTServer{client: client, cfg: cfg, oauth: oauth}
 }
 
 func (rs *RESTServer) RegisterRoutes(mux *http.ServeMux) {
 	// UCP Profile
 	mux.HandleFunc("GET /.well-known/ucp", handleUCPProfile(rs.cfg))
+
+	// OAuth 2.0 Identity Linking endpoints
+	if rs.oauth != nil {
+		mux.HandleFunc("GET /.well-known/oauth-authorization-server", rs.oauth.HandleMetadata)
+		mux.HandleFunc("GET /oauth2/authorize", rs.oauth.HandleAuthorize)
+		mux.HandleFunc("POST /oauth2/token", rs.oauth.HandleToken)
+		mux.HandleFunc("POST /oauth2/revoke", rs.oauth.HandleRevoke)
+	}
 
 	// Product endpoints
 	mux.HandleFunc("GET /ucp/v1/products", rs.handleSearchProducts)
@@ -34,6 +43,22 @@ func (rs *RESTServer) RegisterRoutes(mux *http.ServeMux) {
 
 	// Order endpoints
 	mux.HandleFunc("GET /ucp/v1/orders/{id}", rs.handleGetOrderREST)
+}
+
+func (rs *RESTServer) extractAuthenticatedEmail(r *http.Request) string {
+	if rs.oauth == nil {
+		return ""
+	}
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return ""
+	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	rec, err := rs.oauth.ValidateAccessToken(token)
+	if err != nil {
+		return ""
+	}
+	return rec.customerEmail
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -203,6 +228,13 @@ func (rs *RESTServer) handleCreateCheckoutREST(w http.ResponseWriter, r *http.Re
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_body", fmt.Sprintf("parse request body: %v", err))
 		return
+	}
+
+	// Pre-fill buyer email from OAuth token if not provided
+	if input.Buyer == nil {
+		if email := rs.extractAuthenticatedEmail(r); email != "" {
+			input.Buyer = &UCPBuyer{Email: email}
+		}
 	}
 
 	var lineItems []LineItem

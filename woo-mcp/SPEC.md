@@ -519,23 +519,88 @@ _Goal: Streamable HTTP MCP + UCP REST API_
   - [x] JSON error responses matching UCP error schema
 - [x] **5.5** Tests for Phase 5
 
-### Phase 6: Identity Linking (Future)
+### Phase 6: Identity Linking
 _Goal: OAuth 2.0 customer account linking_
 
-- [ ] **6.1** OAuth 2.0 server endpoints
-  - [ ] `GET /.well-known/oauth-authorization-server` — metadata
-  - [ ] `GET /oauth2/authorize` — authorization page
-  - [ ] `POST /oauth2/token` — token exchange
-  - [ ] `POST /oauth2/revoke` — token revocation
-- [ ] **6.2** WordPress user integration
-  - [ ] Map WC customer accounts to OAuth clients
-  - [ ] Token storage (WP options or custom table)
-  - [ ] Scope validation: `ucp:scopes:checkout_session`
-- [ ] **6.3** Authenticated checkout
-  - [ ] Link checkout sessions to authenticated customers
-  - [ ] Pre-fill buyer info from linked account
-  - [ ] Access order history via linked identity
-- [ ] **6.4** Tests for Phase 6
+- [x] **6.1** OAuth 2.0 server endpoints
+  - [x] `GET /.well-known/oauth-authorization-server` — metadata (RFC 8414)
+  - [x] `GET /oauth2/authorize` — authorization code grant with simulated consent
+  - [x] `POST /oauth2/token` — token exchange (authorization_code + refresh_token grants)
+  - [x] `POST /oauth2/revoke` — token revocation (RFC 7009, cascade on refresh)
+- [x] **6.2** WordPress user integration
+  - [x] Config-based OAuth client registration (`oauth_clients` in config.yaml)
+  - [x] In-memory token storage (auth codes, access tokens, refresh tokens)
+  - [x] Scope validation: `ucp:scopes:checkout_session`
+  - [ ] Persistent token storage (WP options or custom DB table) — future
+  - [ ] WC customer lookup by email via REST API — future (placeholder `ResolveCustomerID`)
+- [x] **6.3** Authenticated checkout
+  - [x] Bearer token extraction from REST `Authorization` header
+  - [x] Pre-fill buyer email from linked account on `create_checkout`
+  - [ ] Scope enforcement per checkout operation — future
+  - [ ] Access order history via linked identity — future
+- [x] **6.4** Tests for Phase 6
+  - [x] Metadata endpoint returns valid RFC 8414 JSON
+  - [x] Auth code flow: authorize → token exchange → validate
+  - [x] Invalid client, redirect URI, response type rejection
+  - [x] Code reuse prevention
+  - [x] Refresh token grant + old refresh revocation
+  - [x] Access token revocation
+  - [x] Refresh token cascade revocation
+  - [x] Unknown token revocation (RFC 7009 compliance)
+  - [x] Full lifecycle integration test
+  - [x] Bearer token extraction + authenticated checkout pre-fill
+  - [x] UCP profile includes identity_linking capability
+
+#### Phase 6 Implementation Notes
+
+**Problem:** UCP's `dev.ucp.common.identity_linking` capability requires a business server to act as an OAuth 2.0 Authorization Server (RFC 6749) so that platforms can link their users' accounts to the merchant's customer records. WooCommerce has no native OAuth 2.0 flow for customer-facing authentication — its built-in REST API auth is merchant-level (consumer key/secret), and WordPress login is session/cookie-based with no standard token endpoint.
+
+**Design Choices & Rationale:**
+
+1. **Self-contained OAuth 2.0 server (`oauth.go`)** — Rather than depending on an external WordPress plugin or reverse-proxying to WP login, the OAuth server is embedded directly in `woo-mcp`. This keeps the deployment single-binary and avoids coupling to WordPress plugin ecosystems that may break across WP versions. The trade-off is that real user authentication is simulated (via an `email` query parameter on `/oauth2/authorize`) rather than delegating to WP's login form — suitable for agent-to-agent flows where the platform already knows the buyer's identity.
+
+2. **In-memory token storage** — Auth codes, access tokens, and refresh tokens are stored in `sync.Mutex`-guarded maps. This is deliberately minimal: the goal is a correct, testable OAuth 2.0 implementation that can be swapped to a persistent backend (PostgreSQL, WP options table, Redis) when production-readiness demands it. For a single-instance MCP server handling agent commerce flows, in-memory state is sufficient and avoids adding a database dependency.
+
+3. **Static client registration via `config.yaml`** — OAuth clients are declared in config (`oauth_clients[]` with `client_id`, `client_secret`, `redirect_uris`). This follows the pattern of pre-registered platform credentials typical in UCP business↔platform relationships, where a merchant explicitly onboards each platform. Dynamic Client Registration (RFC 7591) is deferred.
+
+4. **Authorization Code flow only** — Per UCP spec requirements, only `response_type=code` with `client_secret_basic` token endpoint auth is supported. Implicit and client credentials grants are excluded. Refresh tokens use rotation (old refresh token is revoked on use) to limit token leakage risk.
+
+5. **RFC 7009 revocation with cascade** — Revoking a refresh token also revokes all access tokens for that client+customer pair, matching the UCP spec's MUST requirement for recursive revocation.
+
+6. **Buyer pre-fill on authenticated checkout** — When a REST request to `POST /ucp/v1/checkout-sessions` carries a valid `Authorization: Bearer` header, the server resolves the token to the linked customer email and pre-fills the checkout's buyer info. This demonstrates the identity linking value prop without requiring the full scope enforcement and order history scoping (deferred to future work).
+
+**Use Case — Agent Commerce Flow:**
+
+```
+Platform (AI Agent)              woo-mcp                    WooCommerce
+       │                            │                            │
+       │  GET /.well-known/         │                            │
+       │  oauth-authorization-server│                            │
+       │◄──────────────────────────►│  (metadata discovery)      │
+       │                            │                            │
+       │  GET /oauth2/authorize     │                            │
+       │  ?client_id=...&email=...  │                            │
+       │◄───── 302 redirect ───────│  (issue auth code)         │
+       │                            │                            │
+       │  POST /oauth2/token        │                            │
+       │  grant_type=auth_code      │                            │
+       │◄──────────────────────────►│  (issue access+refresh)    │
+       │                            │                            │
+       │  POST /ucp/v1/checkout-    │                            │
+       │  sessions                  │                            │
+       │  Authorization: Bearer AT  │  POST /wc/v3/orders        │
+       │◄──────────────────────────►│◄──────────────────────────►│
+       │  (buyer email pre-filled)  │  (order created w/ billing)│
+```
+
+The platform discovers OAuth metadata, obtains a token for the buyer, then uses it on checkout calls. The buyer's identity flows through without the platform having to separately collect and pass billing info — reducing friction in agent-mediated purchase flows.
+
+**Future Work:**
+- Real WP authentication: redirect `/oauth2/authorize` to WordPress login page, capture consent, map WP user → WC customer
+- `ResolveCustomerID`: call `GET /wc/v3/customers?email=` to look up the actual WC customer record
+- Persistent token storage for multi-instance deployments
+- Scope enforcement: gate each checkout/order operation on the token's granted scopes
+- Order history scoping: filter `list_orders` to the authenticated customer only
 
 ---
 

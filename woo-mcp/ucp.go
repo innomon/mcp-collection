@@ -229,6 +229,12 @@ func NewDefaultUCPProfile(storeURL string) *UCPProfile {
 					Spec:    "https://ucp.dev/specification/order",
 					Schema:  "https://ucp.dev/schemas/shopping/order.json",
 				},
+				{
+					Name:    "dev.ucp.common.identity_linking",
+					Version: "2026-01-11",
+					Spec:    "https://ucp.dev/specification/identity-linking",
+					Schema:  "https://ucp.dev/schemas/common/identity-linking.json",
+				},
 			},
 		},
 		Payment: UCPProfilePayment{

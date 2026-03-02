@@ -111,8 +111,8 @@ func TestNewDefaultUCPProfile(t *testing.T) {
 	if profile.UCP.Version != "2026-01-11" {
 		t.Errorf("Version = %q, want %q", profile.UCP.Version, "2026-01-11")
 	}
-	if len(profile.UCP.Capabilities) != 3 {
-		t.Errorf("Capabilities count = %d, want 3", len(profile.UCP.Capabilities))
+	if len(profile.UCP.Capabilities) != 4 {
+		t.Errorf("Capabilities count = %d, want 4", len(profile.UCP.Capabilities))
 	}
 	svc, ok := profile.UCP.Services["dev.ucp.shopping"]
 	if !ok {
@@ -394,7 +394,7 @@ func TestRESTSearchProducts(t *testing.T) {
 
 	cfg := &Config{StoreURL: "https://store.example.com", UCPEnabled: true}
 	wc := NewWooClient(wcServer.URL, "ck", "cs")
-	rs := NewRESTServer(wc, cfg)
+	rs := NewRESTServer(wc, cfg, nil)
 
 	mux := http.NewServeMux()
 	rs.RegisterRoutes(mux)

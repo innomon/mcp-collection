@@ -51,7 +51,7 @@ Frappe ERP MCP server with CRUD and DocType contract tooling.
 WooCommerce MCP+UCP server exposing WooCommerce capabilities via both MCP (for AI agents) and REST (for direct platform integration), with A2UI card rendering.
 
 - **Transports**: `stdio` (default), `http`, or `both`
-- **UCP Capabilities**: Shopping discovery, checkout, order, fulfillment
+- **UCP Capabilities**: Shopping discovery, checkout, order, fulfillment, identity linking
 - **MCP Tools** (legacy):
   - `search_products`, `get_order_history`, `checkout`, `raise_issue`
 - **UCP MCP Tools** (when `ucp_enabled: true`):
@@ -61,8 +61,12 @@ WooCommerce MCP+UCP server exposing WooCommerce capabilities via both MCP (for A
 - **REST Endpoints** (when `transport` is `http` or `both`):
   - `GET /.well-known/ucp` — UCP business profile
   - `GET/POST/PATCH /ucp/v1/checkout-sessions`, `/ucp/v1/products`, `/ucp/v1/orders`
+- **OAuth 2.0 Identity Linking** (when `oauth_clients` configured):
+  - `GET /.well-known/oauth-authorization-server` — RFC 8414 metadata
+  - `GET /oauth2/authorize`, `POST /oauth2/token`, `POST /oauth2/revoke`
+  - Bearer token auth on checkout REST endpoints pre-fills buyer info
 - **A2UI Cards**: Product, checkout, and order cards (when `a2ui_enabled: true`)
-- **Config**: `config.yaml` with `store_url`, `consumer_key`, `consumer_secret`, `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`
+- **Config**: `config.yaml` with `store_url`, `consumer_key`, `consumer_secret`, `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`, `oauth_clients`
 
 ## Database Schema
 

@@ -28,3 +28,11 @@ a2ui_enabled: true
 
 # WordPress page IDs containing store policies (optional)
 store_policies_page_ids: []
+
+# OAuth 2.0 clients for UCP Identity Linking (Phase 6)
+# Each client needs a unique client_id, a secret, and allowed redirect URIs
+oauth_clients:
+  - client_id: "platform-agent-001"
+    client_secret: "change-me-to-a-secure-secret"
+    redirect_uris:
+      - "https://platform.example.com/oauth/callback"

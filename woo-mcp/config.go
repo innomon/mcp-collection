@@ -19,7 +19,8 @@ type Config struct {
 	HTTPPort             int    `yaml:"http_port"`               // port for HTTP transport
 	UCPEnabled           bool   `yaml:"ucp_enabled"`             // enable UCP profile + REST endpoints
 	A2UIEnabled          bool   `yaml:"a2ui_enabled"`            // enable A2UI card generation
-	StorePoliciesPageIDs []int  `yaml:"store_policies_page_ids"` // WordPress page IDs for policies
+	StorePoliciesPageIDs []int         `yaml:"store_policies_page_ids"` // WordPress page IDs for policies
+	OAuthClients         []OAuthClient `yaml:"oauth_clients"`
 }
 
 func LoadConfig(args []string) (*Config, error) {

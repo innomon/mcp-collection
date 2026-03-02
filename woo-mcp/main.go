@@ -38,7 +38,12 @@ func main() {
 	if cfg.Transport == "http" || cfg.Transport == "both" {
 		httpMux := http.NewServeMux()
 
-		rest := NewRESTServer(wc, cfg)
+		var oauth *OAuthServer
+		if len(cfg.OAuthClients) > 0 {
+			oauth = NewOAuthServer(cfg, cfg.OAuthClients)
+		}
+
+		rest := NewRESTServer(wc, cfg, oauth)
 		rest.RegisterRoutes(httpMux)
 
 		httpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
