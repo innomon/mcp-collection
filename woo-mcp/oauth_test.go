@@ -9,9 +9,47 @@ import (
 	"testing"
 )
 
-func testOAuthServer() (*OAuthServer, *Config) {
+// mockWPServer creates a mock WordPress + WooCommerce backend that handles:
+// - GET /wp-json/wp/v2/users/me (WP auth validation via Basic Auth)
+// - GET /wp-json/wc/v3/customers?email= (WC customer lookup)
+func mockWPServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.URL.Path == "/wp-json/wp/v2/users/me":
+			user, pass, ok := r.BasicAuth()
+			if !ok || user != "buyer@example.com" || pass != "correct-password" {
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(map[string]string{"code": "invalid_credentials"})
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{"id": 7})
+
+		case r.URL.Path == "/wp-json/wc/v3/customers":
+			email := r.URL.Query().Get("email")
+			if email == "buyer@example.com" {
+				json.NewEncoder(w).Encode([]map[string]any{
+					{"id": 42, "email": "buyer@example.com", "first_name": "Test", "last_name": "Buyer"},
+				})
+			} else {
+				json.NewEncoder(w).Encode([]map[string]any{})
+			}
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func testOAuthServer(t *testing.T) (*OAuthServer, *Config, *httptest.Server) {
+	t.Helper()
+	wp := mockWPServer(t)
+	wc := NewWooClient(wp.URL, "ck_test", "cs_test")
 	cfg := &Config{
-		StoreURL: "https://store.example.com",
+		StoreURL:   "https://store.example.com",
+		ServerName: "TestStore",
 		OAuthClients: []OAuthClient{
 			{
 				ClientID:     "test-client",
@@ -20,12 +58,13 @@ func testOAuthServer() (*OAuthServer, *Config) {
 			},
 		},
 	}
-	oauth := NewOAuthServer(cfg, cfg.OAuthClients)
-	return oauth, cfg
+	oauth := NewOAuthServer(cfg, cfg.OAuthClients, wc)
+	return oauth, cfg, wp
 }
 
 func TestOAuthMetadata(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	req := httptest.NewRequest("GET", "/.well-known/oauth-authorization-server", nil)
 	w := httptest.NewRecorder()
@@ -64,18 +103,54 @@ func TestOAuthMetadata(t *testing.T) {
 	}
 }
 
-func TestOAuthAuthorizeSuccess(t *testing.T) {
-	oauth, _ := testOAuthServer()
+func TestOAuthAuthorizeFormRendered(t *testing.T) {
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	q := url.Values{
 		"client_id":     {"test-client"},
 		"redirect_uri":  {"https://platform.example.com/callback"},
 		"response_type": {"code"},
 		"scope":         {"ucp:scopes:checkout_session"},
-		"state":         {"xyz123"},
-		"email":         {"buyer@example.com"},
 	}
 	req := httptest.NewRequest("GET", "/oauth2/authorize?"+q.Encode(), nil)
+	w := httptest.NewRecorder()
+	oauth.HandleAuthorize(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "text/html") {
+		t.Errorf("expected text/html content type, got %s", ct)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Sign In") {
+		t.Error("login form should contain 'Sign In'")
+	}
+	if !strings.Contains(body, `name="email"`) {
+		t.Error("login form should contain email input")
+	}
+	if !strings.Contains(body, `name="password"`) {
+		t.Error("login form should contain password input")
+	}
+}
+
+func TestOAuthAuthorizeSuccess(t *testing.T) {
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
+	form := url.Values{
+		"client_id":     {"test-client"},
+		"redirect_uri":  {"https://platform.example.com/callback"},
+		"response_type": {"code"},
+		"scope":         {"ucp:scopes:checkout_session"},
+		"state":         {"xyz123"},
+		"email":         {"buyer@example.com"},
+		"password":      {"correct-password"},
+	}
+	req := httptest.NewRequest("POST", "/oauth2/authorize", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 	oauth.HandleAuthorize(w, req)
 
@@ -99,14 +174,65 @@ func TestOAuthAuthorizeSuccess(t *testing.T) {
 	}
 }
 
+func TestOAuthAuthorizeInvalidPassword(t *testing.T) {
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
+	form := url.Values{
+		"client_id":     {"test-client"},
+		"redirect_uri":  {"https://platform.example.com/callback"},
+		"response_type": {"code"},
+		"email":         {"buyer@example.com"},
+		"password":      {"wrong-password"},
+	}
+	req := httptest.NewRequest("POST", "/oauth2/authorize", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	oauth.HandleAuthorize(w, req)
+
+	// Should re-render the login form with error message (200 with HTML)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (re-rendered form), got %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Invalid email or password") {
+		t.Error("should show error message for invalid credentials")
+	}
+}
+
+func TestOAuthAuthorizeMissingCredentials(t *testing.T) {
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
+	form := url.Values{
+		"client_id":     {"test-client"},
+		"redirect_uri":  {"https://platform.example.com/callback"},
+		"response_type": {"code"},
+		"email":         {"buyer@example.com"},
+		// password missing
+	}
+	req := httptest.NewRequest("POST", "/oauth2/authorize", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	oauth.HandleAuthorize(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (re-rendered form), got %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Email and password are required") {
+		t.Error("should show error message for missing credentials")
+	}
+}
+
 func TestOAuthAuthorizeInvalidClient(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	q := url.Values{
 		"client_id":     {"unknown-client"},
 		"redirect_uri":  {"https://platform.example.com/callback"},
 		"response_type": {"code"},
-		"email":         {"buyer@example.com"},
 	}
 	req := httptest.NewRequest("GET", "/oauth2/authorize?"+q.Encode(), nil)
 	w := httptest.NewRecorder()
@@ -118,13 +244,13 @@ func TestOAuthAuthorizeInvalidClient(t *testing.T) {
 }
 
 func TestOAuthAuthorizeInvalidRedirectURI(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	q := url.Values{
 		"client_id":     {"test-client"},
 		"redirect_uri":  {"https://evil.example.com/callback"},
 		"response_type": {"code"},
-		"email":         {"buyer@example.com"},
 	}
 	req := httptest.NewRequest("GET", "/oauth2/authorize?"+q.Encode(), nil)
 	w := httptest.NewRecorder()
@@ -136,13 +262,13 @@ func TestOAuthAuthorizeInvalidRedirectURI(t *testing.T) {
 }
 
 func TestOAuthAuthorizeUnsupportedResponseType(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	q := url.Values{
 		"client_id":     {"test-client"},
 		"redirect_uri":  {"https://platform.example.com/callback"},
 		"response_type": {"token"},
-		"email":         {"buyer@example.com"},
 	}
 	req := httptest.NewRequest("GET", "/oauth2/authorize?"+q.Encode(), nil)
 	w := httptest.NewRecorder()
@@ -155,19 +281,21 @@ func TestOAuthAuthorizeUnsupportedResponseType(t *testing.T) {
 
 func doAuthorize(t *testing.T, oauth *OAuthServer) string {
 	t.Helper()
-	q := url.Values{
+	form := url.Values{
 		"client_id":     {"test-client"},
 		"redirect_uri":  {"https://platform.example.com/callback"},
 		"response_type": {"code"},
 		"scope":         {"ucp:scopes:checkout_session"},
 		"state":         {"s"},
 		"email":         {"buyer@example.com"},
+		"password":      {"correct-password"},
 	}
-	req := httptest.NewRequest("GET", "/oauth2/authorize?"+q.Encode(), nil)
+	req := httptest.NewRequest("POST", "/oauth2/authorize", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 	oauth.HandleAuthorize(w, req)
 	if w.Code != http.StatusFound {
-		t.Fatalf("authorize failed: %d", w.Code)
+		t.Fatalf("authorize failed: %d: %s", w.Code, w.Body.String())
 	}
 	loc, _ := url.Parse(w.Header().Get("Location"))
 	return loc.Query().Get("code")
@@ -194,7 +322,9 @@ func doTokenExchange(t *testing.T, oauth *OAuthServer, code string) (string, str
 }
 
 func TestOAuthTokenExchange(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
 	code := doAuthorize(t, oauth)
 	at, rt := doTokenExchange(t, oauth, code)
 
@@ -216,10 +346,15 @@ func TestOAuthTokenExchange(t *testing.T) {
 	if rec.scope != "ucp:scopes:checkout_session" {
 		t.Errorf("unexpected scope: %s", rec.scope)
 	}
+	// Customer ID should be resolved from mock WC API
+	if rec.customerID != 42 {
+		t.Errorf("expected customerID 42 (from WC lookup), got %d", rec.customerID)
+	}
 }
 
 func TestOAuthTokenExchangeInvalidCode(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	form := url.Values{
 		"grant_type":   {"authorization_code"},
@@ -238,7 +373,8 @@ func TestOAuthTokenExchangeInvalidCode(t *testing.T) {
 }
 
 func TestOAuthTokenExchangeWrongClient(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	form := url.Values{
 		"grant_type": {"authorization_code"},
@@ -256,7 +392,8 @@ func TestOAuthTokenExchangeWrongClient(t *testing.T) {
 }
 
 func TestOAuthTokenExchangeNoAuth(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	form := url.Values{"grant_type": {"authorization_code"}}
 	req := httptest.NewRequest("POST", "/oauth2/token", strings.NewReader(form.Encode()))
@@ -270,7 +407,9 @@ func TestOAuthTokenExchangeNoAuth(t *testing.T) {
 }
 
 func TestOAuthCodeReuse(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
 	code := doAuthorize(t, oauth)
 
 	// First exchange succeeds
@@ -294,7 +433,9 @@ func TestOAuthCodeReuse(t *testing.T) {
 }
 
 func TestOAuthRefreshToken(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
 	code := doAuthorize(t, oauth)
 	_, rt := doTokenExchange(t, oauth, code)
 
@@ -348,7 +489,9 @@ func TestOAuthRefreshToken(t *testing.T) {
 }
 
 func TestOAuthRevoke(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
 	code := doAuthorize(t, oauth)
 	at, _ := doTokenExchange(t, oauth, code)
 
@@ -375,7 +518,9 @@ func TestOAuthRevoke(t *testing.T) {
 }
 
 func TestOAuthRevokeRefreshCascades(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
+
 	code := doAuthorize(t, oauth)
 	at, rt := doTokenExchange(t, oauth, code)
 
@@ -402,7 +547,8 @@ func TestOAuthRevokeRefreshCascades(t *testing.T) {
 }
 
 func TestOAuthRevokeUnknownToken(t *testing.T) {
-	oauth, _ := testOAuthServer()
+	oauth, _, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	form := url.Values{"token": {"nonexistent-token"}}
 	req := httptest.NewRequest("POST", "/oauth2/revoke", strings.NewReader(form.Encode()))
@@ -418,11 +564,13 @@ func TestOAuthRevokeUnknownToken(t *testing.T) {
 }
 
 func TestOAuthFullLifecycle(t *testing.T) {
-	oauth, cfg := testOAuthServer()
+	oauth, cfg, wp := testOAuthServer(t)
+	defer wp.Close()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /.well-known/oauth-authorization-server", oauth.HandleMetadata)
 	mux.HandleFunc("GET /oauth2/authorize", oauth.HandleAuthorize)
+	mux.HandleFunc("POST /oauth2/authorize", oauth.HandleAuthorize)
 	mux.HandleFunc("POST /oauth2/token", oauth.HandleToken)
 	mux.HandleFunc("POST /oauth2/revoke", oauth.HandleRevoke)
 	ts := httptest.NewServer(mux)
@@ -443,7 +591,7 @@ func TestOAuthFullLifecycle(t *testing.T) {
 		t.Errorf("unexpected issuer: %v", meta["issuer"])
 	}
 
-	// 2. Authorize (don't follow redirects)
+	// 2. GET authorize renders login form
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
@@ -452,25 +600,42 @@ func TestOAuthFullLifecycle(t *testing.T) {
 		"redirect_uri":  {"https://platform.example.com/callback"},
 		"response_type": {"code"},
 		"scope":         {"ucp:scopes:checkout_session"},
-		"state":         {"abc"},
-		"email":         {"lifecycle@example.com"},
 	}.Encode()
 
 	resp2, err := client.Get(authURL)
 	if err != nil {
-		t.Fatalf("authorize request: %v", err)
+		t.Fatalf("authorize GET request: %v", err)
 	}
 	defer resp2.Body.Close()
-	if resp2.StatusCode != http.StatusFound {
-		t.Fatalf("authorize status: %d", resp2.StatusCode)
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("authorize GET status: %d (expected 200 login form)", resp2.StatusCode)
 	}
-	loc, _ := url.Parse(resp2.Header.Get("Location"))
+
+	// 3. POST credentials to authorize
+	authForm := url.Values{
+		"client_id":     {"test-client"},
+		"redirect_uri":  {"https://platform.example.com/callback"},
+		"response_type": {"code"},
+		"scope":         {"ucp:scopes:checkout_session"},
+		"state":         {"abc"},
+		"email":         {"buyer@example.com"},
+		"password":      {"correct-password"},
+	}
+	resp3, err := client.PostForm(ts.URL+"/oauth2/authorize", authForm)
+	if err != nil {
+		t.Fatalf("authorize POST request: %v", err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusFound {
+		t.Fatalf("authorize POST status: %d", resp3.StatusCode)
+	}
+	loc, _ := url.Parse(resp3.Header.Get("Location"))
 	code := loc.Query().Get("code")
 	if code == "" {
 		t.Fatal("no code in redirect")
 	}
 
-	// 3. Exchange code for token
+	// 4. Exchange code for token
 	tokenForm := url.Values{
 		"grant_type":   {"authorization_code"},
 		"code":         {code},
@@ -479,29 +644,32 @@ func TestOAuthFullLifecycle(t *testing.T) {
 	tokenReq, _ := http.NewRequest("POST", ts.URL+"/oauth2/token", strings.NewReader(tokenForm.Encode()))
 	tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	tokenReq.SetBasicAuth("test-client", "test-secret")
-	resp3, err := http.DefaultClient.Do(tokenReq)
+	resp4, err := http.DefaultClient.Do(tokenReq)
 	if err != nil {
 		t.Fatalf("token request: %v", err)
 	}
-	defer resp3.Body.Close()
-	if resp3.StatusCode != http.StatusOK {
-		t.Fatalf("token status: %d", resp3.StatusCode)
+	defer resp4.Body.Close()
+	if resp4.StatusCode != http.StatusOK {
+		t.Fatalf("token status: %d", resp4.StatusCode)
 	}
 	var tokenResp map[string]any
-	json.NewDecoder(resp3.Body).Decode(&tokenResp)
+	json.NewDecoder(resp4.Body).Decode(&tokenResp)
 	at := tokenResp["access_token"].(string)
 	rt := tokenResp["refresh_token"].(string)
 
-	// 4. Validate token
+	// 5. Validate token
 	rec, err := oauth.ValidateAccessToken(at)
 	if err != nil {
 		t.Fatalf("validate: %v", err)
 	}
-	if rec.customerEmail != "lifecycle@example.com" {
+	if rec.customerEmail != "buyer@example.com" {
 		t.Errorf("unexpected email: %s", rec.customerEmail)
 	}
+	if rec.customerID != 42 {
+		t.Errorf("expected customerID 42, got %d", rec.customerID)
+	}
 
-	// 5. Refresh
+	// 6. Refresh
 	refreshForm := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {rt},
@@ -509,30 +677,30 @@ func TestOAuthFullLifecycle(t *testing.T) {
 	refreshReq, _ := http.NewRequest("POST", ts.URL+"/oauth2/token", strings.NewReader(refreshForm.Encode()))
 	refreshReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	refreshReq.SetBasicAuth("test-client", "test-secret")
-	resp4, err := http.DefaultClient.Do(refreshReq)
+	resp5, err := http.DefaultClient.Do(refreshReq)
 	if err != nil {
 		t.Fatalf("refresh request: %v", err)
 	}
-	defer resp4.Body.Close()
-	if resp4.StatusCode != http.StatusOK {
-		t.Fatalf("refresh status: %d", resp4.StatusCode)
+	defer resp5.Body.Close()
+	if resp5.StatusCode != http.StatusOK {
+		t.Fatalf("refresh status: %d", resp5.StatusCode)
 	}
 	var refreshResp map[string]any
-	json.NewDecoder(resp4.Body).Decode(&refreshResp)
+	json.NewDecoder(resp5.Body).Decode(&refreshResp)
 	newAT := refreshResp["access_token"].(string)
 
-	// 6. Revoke
+	// 7. Revoke
 	revokeForm := url.Values{"token": {newAT}, "token_type_hint": {"access_token"}}
 	revokeReq, _ := http.NewRequest("POST", ts.URL+"/oauth2/revoke", strings.NewReader(revokeForm.Encode()))
 	revokeReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	revokeReq.SetBasicAuth("test-client", "test-secret")
-	resp5, err := http.DefaultClient.Do(revokeReq)
+	resp6, err := http.DefaultClient.Do(revokeReq)
 	if err != nil {
 		t.Fatalf("revoke request: %v", err)
 	}
-	defer resp5.Body.Close()
-	if resp5.StatusCode != http.StatusOK {
-		t.Fatalf("revoke status: %d", resp5.StatusCode)
+	defer resp6.Body.Close()
+	if resp6.StatusCode != http.StatusOK {
+		t.Fatalf("revoke status: %d", resp6.StatusCode)
 	}
 
 	// Verify revoked
@@ -543,7 +711,9 @@ func TestOAuthFullLifecycle(t *testing.T) {
 }
 
 func TestExtractAuthenticatedEmail(t *testing.T) {
-	oauth, cfg := testOAuthServer()
+	oauth, cfg, wp := testOAuthServer(t)
+	defer wp.Close()
+
 	wc := NewWooClient("http://localhost", "ck", "cs")
 	rs := NewRESTServer(wc, cfg, oauth)
 

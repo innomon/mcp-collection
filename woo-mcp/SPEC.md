@@ -524,15 +524,18 @@ _Goal: OAuth 2.0 customer account linking_
 
 - [x] **6.1** OAuth 2.0 server endpoints
   - [x] `GET /.well-known/oauth-authorization-server` — metadata (RFC 8414)
-  - [x] `GET /oauth2/authorize` — authorization code grant with simulated consent
+  - [x] `GET /oauth2/authorize` — renders HTML login form for credential collection
+  - [x] `POST /oauth2/authorize` — validates credentials against WordPress, issues auth code
   - [x] `POST /oauth2/token` — token exchange (authorization_code + refresh_token grants)
   - [x] `POST /oauth2/revoke` — token revocation (RFC 7009, cascade on refresh)
 - [x] **6.2** WordPress user integration
   - [x] Config-based OAuth client registration (`oauth_clients` in config.yaml)
   - [x] In-memory token storage (auth codes, access tokens, refresh tokens)
   - [x] Scope validation: `ucp:scopes:checkout_session`
+  - [x] WP credential validation via `AuthenticateWPUser` (`GET /wp-json/wp/v2/users/me` with Basic Auth)
+  - [x] WC customer lookup via `GetCustomerByEmail` (`GET /wc/v3/customers?email=`)
+  - [x] `resolveCustomerID` replaces placeholder `ResolveCustomerID`
   - [ ] Persistent token storage (WP options or custom DB table) — future
-  - [ ] WC customer lookup by email via REST API — future (placeholder `ResolveCustomerID`)
 - [x] **6.3** Authenticated checkout
   - [x] Bearer token extraction from REST `Authorization` header
   - [x] Pre-fill buyer email from linked account on `create_checkout`
@@ -540,7 +543,11 @@ _Goal: OAuth 2.0 customer account linking_
   - [ ] Access order history via linked identity — future
 - [x] **6.4** Tests for Phase 6
   - [x] Metadata endpoint returns valid RFC 8414 JSON
-  - [x] Auth code flow: authorize → token exchange → validate
+  - [x] Login form rendered on GET /oauth2/authorize
+  - [x] Auth code flow: login form → POST credentials → token exchange → validate
+  - [x] Invalid password re-renders login form with error
+  - [x] Missing credentials re-renders login form with error
+  - [x] Customer ID resolved from WC API (not hardcoded 0)
   - [x] Invalid client, redirect URI, response type rejection
   - [x] Code reuse prevention
   - [x] Refresh token grant + old refresh revocation
@@ -557,7 +564,7 @@ _Goal: OAuth 2.0 customer account linking_
 
 **Design Choices & Rationale:**
 
-1. **Self-contained OAuth 2.0 server (`oauth.go`)** — Rather than depending on an external WordPress plugin or reverse-proxying to WP login, the OAuth server is embedded directly in `woo-mcp`. This keeps the deployment single-binary and avoids coupling to WordPress plugin ecosystems that may break across WP versions. The trade-off is that real user authentication is simulated (via an `email` query parameter on `/oauth2/authorize`) rather than delegating to WP's login form — suitable for agent-to-agent flows where the platform already knows the buyer's identity.
+1. **Self-contained OAuth 2.0 server (`oauth.go`)** — Rather than depending on an external WordPress plugin or reverse-proxying to WP login, the OAuth server is embedded directly in `woo-mcp`. This keeps the deployment single-binary and avoids coupling to WordPress plugin ecosystems that may break across WP versions. The `/oauth2/authorize` endpoint serves an HTML login form (GET) that collects email and password, then validates credentials against WordPress via `GET /wp-json/wp/v2/users/me` with HTTP Basic Auth (POST). This works with WordPress Application Passwords (WP 5.6+) or plugins that enable Basic Auth for standard credentials. After successful authentication, the WC customer ID is resolved via `GET /wc/v3/customers?email=`.
 
 2. **In-memory token storage** — Auth codes, access tokens, and refresh tokens are stored in `sync.Mutex`-guarded maps. This is deliberately minimal: the goal is a correct, testable OAuth 2.0 implementation that can be swapped to a persistent backend (PostgreSQL, WP options table, Redis) when production-readiness demands it. For a single-instance MCP server handling agent commerce flows, in-memory state is sufficient and avoids adding a database dependency.
 
@@ -572,14 +579,25 @@ _Goal: OAuth 2.0 customer account linking_
 **Use Case — Agent Commerce Flow:**
 
 ```
-Platform (AI Agent)              woo-mcp                    WooCommerce
+Platform (AI Agent)              woo-mcp                    WordPress/WooCommerce
        │                            │                            │
        │  GET /.well-known/         │                            │
        │  oauth-authorization-server│                            │
        │◄──────────────────────────►│  (metadata discovery)      │
        │                            │                            │
        │  GET /oauth2/authorize     │                            │
-       │  ?client_id=...&email=...  │                            │
+       │  ?client_id=...&scope=...  │                            │
+       │◄────── 200 HTML form ─────│  (login form rendered)     │
+       │                            │                            │
+       │  POST /oauth2/authorize    │                            │
+       │  email=...&password=...    │  GET /wp-json/wp/v2/       │
+       │                            │  users/me (Basic Auth)     │
+       │                            │◄──────────────────────────►│
+       │                            │  (validate credentials)    │
+       │                            │  GET /wc/v3/customers      │
+       │                            │  ?email=...                │
+       │                            │◄──────────────────────────►│
+       │                            │  (resolve customer ID)     │
        │◄───── 302 redirect ───────│  (issue auth code)         │
        │                            │                            │
        │  POST /oauth2/token        │                            │
@@ -593,11 +611,9 @@ Platform (AI Agent)              woo-mcp                    WooCommerce
        │  (buyer email pre-filled)  │  (order created w/ billing)│
 ```
 
-The platform discovers OAuth metadata, obtains a token for the buyer, then uses it on checkout calls. The buyer's identity flows through without the platform having to separately collect and pass billing info — reducing friction in agent-mediated purchase flows.
+The platform discovers OAuth metadata, redirects the buyer to the login form, the buyer authenticates with their WordPress credentials (Application Passwords supported), and the server issues tokens. The buyer's identity flows through to checkout calls without the platform needing to separately collect billing info.
 
 **Future Work:**
-- Real WP authentication: redirect `/oauth2/authorize` to WordPress login page, capture consent, map WP user → WC customer
-- `ResolveCustomerID`: call `GET /wc/v3/customers?email=` to look up the actual WC customer record
 - Persistent token storage for multi-instance deployments
 - Scope enforcement: gate each checkout/order operation on the token's granted scopes
 - Order history scoping: filter `list_orders` to the authenticated customer only

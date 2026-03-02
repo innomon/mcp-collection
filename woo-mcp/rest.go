@@ -26,6 +26,7 @@ func (rs *RESTServer) RegisterRoutes(mux *http.ServeMux) {
 	if rs.oauth != nil {
 		mux.HandleFunc("GET /.well-known/oauth-authorization-server", rs.oauth.HandleMetadata)
 		mux.HandleFunc("GET /oauth2/authorize", rs.oauth.HandleAuthorize)
+		mux.HandleFunc("POST /oauth2/authorize", rs.oauth.HandleAuthorize)
 		mux.HandleFunc("POST /oauth2/token", rs.oauth.HandleToken)
 		mux.HandleFunc("POST /oauth2/revoke", rs.oauth.HandleRevoke)
 	}

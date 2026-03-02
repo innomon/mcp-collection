@@ -477,6 +477,68 @@ func (c *WooClient) GetStoreSettings(ctx context.Context) ([]StoreSetting, error
 	return settings, nil
 }
 
+// WCCustomer represents a WooCommerce customer record.
+type WCCustomer struct {
+	ID        int    `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Username  string `json:"username"`
+}
+
+// GetCustomerByEmail looks up a WooCommerce customer by email address.
+// Returns nil if no customer is found with that email.
+func (c *WooClient) GetCustomerByEmail(ctx context.Context, email string) (*WCCustomer, error) {
+	path := "/wp-json/wc/v3/customers?email=" + url.QueryEscape(email)
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("get customer by email: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get customer by email: unexpected status %d", resp.StatusCode)
+	}
+	var customers []WCCustomer
+	if err := json.NewDecoder(resp.Body).Decode(&customers); err != nil {
+		return nil, fmt.Errorf("get customer by email: %w", err)
+	}
+	if len(customers) == 0 {
+		return nil, nil
+	}
+	return &customers[0], nil
+}
+
+// AuthenticateWPUser validates WordPress user credentials by attempting to
+// access the WP REST API with the provided email/password via HTTP Basic Auth.
+// This works with WordPress Application Passwords (WP 5.6+) or plugins that
+// enable Basic Auth for standard credentials.
+// Returns the authenticated user ID on success, or an error if credentials are invalid.
+func (c *WooClient) AuthenticateWPUser(ctx context.Context, email, password string) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/wp-json/wp/v2/users/me", nil)
+	if err != nil {
+		return 0, fmt.Errorf("authenticate wp user: %w", err)
+	}
+	req.SetBasicAuth(email, password)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("authenticate wp user: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return 0, fmt.Errorf("invalid credentials")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("authenticate wp user: unexpected status %d", resp.StatusCode)
+	}
+	var user struct {
+		ID int `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return 0, fmt.Errorf("authenticate wp user: %w", err)
+	}
+	return user.ID, nil
+}
+
 func (c *WooClient) GetPages(ctx context.Context, search string) ([]WPPage, error) {
 	path := "/wp-json/wp/v2/pages?search=" + url.QueryEscape(search) + "&per_page=10"
 	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)

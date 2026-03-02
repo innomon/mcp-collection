@@ -40,7 +40,7 @@ func main() {
 
 		var oauth *OAuthServer
 		if len(cfg.OAuthClients) > 0 {
-			oauth = NewOAuthServer(cfg, cfg.OAuthClients)
+			oauth = NewOAuthServer(cfg, cfg.OAuthClients, wc)
 		}
 
 		rest := NewRESTServer(wc, cfg, oauth)
