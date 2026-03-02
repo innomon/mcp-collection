@@ -387,137 +387,137 @@ woo-mcp/
 ### Phase 1: Foundation — UCP Types & Enhanced Discovery
 _Goal: UCP data model + richer product search matching Shopify Storefront MCP_
 
-- [ ] **1.1** Define UCP core types in `ucp.go`
-  - [ ] `UCPEnvelope` (version, capabilities array)
-  - [ ] `UCPCheckout` (id, status, line_items, buyer, currency, totals, links, continue_url, payment, fulfillment, order)
-  - [ ] `UCPLineItem` (id, item, quantity, totals, parent_id)
-  - [ ] `UCPItem` (id, title, price, image_url)
-  - [ ] `UCPTotal` (type enum, display_text, amount)
-  - [ ] `UCPBuyer` (email, first_name, last_name)
-  - [ ] `UCPOrder` (id, checkout_id, permalink_url, line_items, fulfillment, adjustments, totals)
-  - [ ] `UCPFulfillment` (methods/expectations/events)
-  - [ ] `UCPAdjustment` (id, type, occurred_at, status, line_items, amount, description)
-  - [ ] `UCPPayment` (handlers, instruments)
-  - [ ] `UCPLink` (type, url)
-  - [ ] `UCPMessage` (code, message, severity)
-- [ ] **1.2** Extend `WooClient` in `woocommerce.go`
-  - [ ] `GetProduct(ctx, id)` — single product with variants + images
-  - [ ] `GetProductCategories(ctx)` — list categories
-  - [ ] `SearchProducts(ctx, SearchParams)` — with category, price range, pagination
+- [x] **1.1** Define UCP core types in `ucp.go`
+  - [x] `UCPEnvelope` (version, capabilities array)
+  - [x] `UCPCheckout` (id, status, line_items, buyer, currency, totals, links, continue_url, payment, fulfillment, order)
+  - [x] `UCPLineItem` (id, item, quantity, totals, parent_id)
+  - [x] `UCPItem` (id, title, price, image_url)
+  - [x] `UCPTotal` (type enum, display_text, amount)
+  - [x] `UCPBuyer` (email, first_name, last_name)
+  - [x] `UCPOrder` (id, checkout_id, permalink_url, line_items, fulfillment, adjustments, totals)
+  - [x] `UCPFulfillment` (methods/expectations/events)
+  - [x] `UCPAdjustment` (id, type, occurred_at, status, line_items, amount, description)
+  - [x] `UCPPayment` (handlers, instruments)
+  - [x] `UCPLink` (type, url)
+  - [x] `UCPMessage` (code, message, severity)
+- [x] **1.2** Extend `WooClient` in `woocommerce.go`
+  - [x] `GetProduct(ctx, id)` — single product with variants + images
+  - [x] `GetProductCategories(ctx)` — list categories
+  - [x] `SearchProducts(ctx, SearchParams)` — with category, price range, pagination
   - [ ] `GetShippingZones(ctx)` — for fulfillment options
-  - [ ] `GetOrderRefunds(ctx, orderID)` — for adjustments
-  - [ ] `GetOrderNotes(ctx, orderID)` — for fulfillment events
-  - [ ] `UpdateOrder(ctx, id, payload)` — update existing order
-  - [ ] `GetStoreSettings(ctx)` — currency, tax settings
-  - [ ] Price conversion helpers: WC decimal string ↔ UCP minor units (cents)
-- [ ] **1.3** Implement `ucp_discovery.go`
-  - [ ] `search_shop_catalog` tool with context-aware search
-  - [ ] `get_product` tool with full variant details
-  - [ ] `get_product_categories` tool
-  - [ ] `search_shop_policies_and_faqs` tool (query WP pages)
-- [ ] **1.4** Update config
-  - [ ] Add `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled` fields
-  - [ ] Update `config.yaml.example`
-- [ ] **1.5** Refactor `tools.go` → register both legacy and UCP tools
-- [ ] **1.6** Tests for Phase 1
-  - [ ] Unit tests for UCP type serialization
-  - [ ] Unit tests for WC↔UCP price conversion
-  - [ ] Unit tests for discovery tools
+  - [x] `GetOrderRefunds(ctx, orderID)` — for adjustments
+  - [x] `GetOrderNotes(ctx, orderID)` — for fulfillment events
+  - [x] `UpdateOrder(ctx, id, payload)` — update existing order
+  - [x] `GetStoreSettings(ctx)` — currency, tax settings
+  - [x] Price conversion helpers: WC decimal string ↔ UCP minor units (cents)
+- [x] **1.3** Implement `ucp_discovery.go`
+  - [x] `search_shop_catalog` tool with context-aware search
+  - [x] `get_product` tool with full variant details
+  - [x] `get_product_categories` tool
+  - [x] `search_shop_policies_and_faqs` tool (query WP pages)
+- [x] **1.4** Update config
+  - [x] Add `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled` fields
+  - [x] Update `config.yaml.example`
+- [x] **1.5** Refactor `tools.go` → register both legacy and UCP tools
+- [x] **1.6** Tests for Phase 1
+  - [x] Unit tests for UCP type serialization
+  - [x] Unit tests for WC↔UCP price conversion
+  - [x] Unit tests for discovery tools
 
 ### Phase 2: Checkout Capability
 _Goal: Full UCP Checkout lifecycle via MCP_
 
-- [ ] **2.1** Implement `ucp_checkout.go`
-  - [ ] `create_checkout` — create WC order (pending) → return UCPCheckout
-  - [ ] `get_checkout` — fetch WC order → return UCPCheckout
-  - [ ] `update_checkout` — update WC order line items/buyer/fulfillment → return UCPCheckout
-  - [ ] `complete_checkout` — set WC order status + return `continue_url` for payment
-  - [ ] `cancel_checkout` — cancel WC order → return UCPCheckout
-  - [ ] WC Order → UCPCheckout mapping function
-  - [ ] UCPCheckout status derivation from WC order state
-  - [ ] `continue_url` construction for payment redirect
+- [x] **2.1** Implement `ucp_checkout.go`
+  - [x] `create_checkout` — create WC order (pending) → return UCPCheckout
+  - [x] `get_checkout` — fetch WC order → return UCPCheckout
+  - [x] `update_checkout` — update WC order line items/buyer/fulfillment → return UCPCheckout
+  - [x] `complete_checkout` — set WC order status + return `continue_url` for payment
+  - [x] `cancel_checkout` — cancel WC order → return UCPCheckout
+  - [x] WC Order → UCPCheckout mapping function
+  - [x] UCPCheckout status derivation from WC order state
+  - [x] `continue_url` construction for payment redirect
   - [ ] Idempotency key handling (store in order meta)
   - [ ] `_meta.ucp.profile` extraction and validation
-- [ ] **2.2** UCP response envelope
+- [x] **2.2** UCP response envelope
   - [ ] Every response includes `ucp.version` + `ucp.capabilities[]`
   - [ ] Every checkout response includes `links[]` (privacy policy, TOS from WC settings)
-  - [ ] `totals[]` computed from WC: subtotal, discount, fulfillment, tax, total
-  - [ ] `payment.handlers[]` with redirect handler config
-- [ ] **2.3** Register MCP tools in `tools.go`
-  - [ ] `create_checkout`, `get_checkout`, `update_checkout`, `complete_checkout`, `cancel_checkout`
+  - [x] `totals[]` computed from WC: subtotal, discount, fulfillment, tax, total
+  - [x] `payment.handlers[]` with redirect handler config
+- [x] **2.3** Register MCP tools in `tools.go`
+  - [x] `create_checkout`, `get_checkout`, `update_checkout`, `complete_checkout`, `cancel_checkout`
   - [ ] Input validation against UCP schemas
   - [ ] Error responses with UCP error codes (`MERCHANDISE_NOT_AVAILABLE`, etc.)
-- [ ] **2.4** Tests for Phase 2
-  - [ ] Checkout lifecycle integration tests (create → update → complete)
-  - [ ] Status mapping tests
+- [x] **2.4** Tests for Phase 2
+  - [x] Checkout lifecycle integration tests (create → update → complete)
+  - [x] Status mapping tests
   - [ ] Error handling tests
 
 ### Phase 3: Order Capability
 _Goal: UCP Order with fulfillment tracking and adjustments_
 
-- [ ] **3.1** Implement `ucp_order.go`
-  - [ ] `get_order` tool — WC order + refunds + notes → UCPOrder
-  - [ ] `list_orders` tool — list with pagination
-  - [ ] WC Order → UCPOrder mapping
-    - [ ] `line_items[]` with quantity.total/fulfilled derivation
-    - [ ] `fulfillment.expectations[]` from shipping lines
-    - [ ] `fulfillment.events[]` from order notes (tracking info)
-    - [ ] `adjustments[]` from WC refunds
-    - [ ] `totals[]` (subtotal, shipping, tax, discount, total)
-    - [ ] Line item status derivation (processing/partial/fulfilled)
-  - [ ] `permalink_url` construction
+- [x] **3.1** Implement `ucp_order.go`
+  - [x] `get_order` tool — WC order + refunds + notes → UCPOrder
+  - [x] `list_orders` tool — list with pagination
+  - [x] WC Order → UCPOrder mapping
+    - [x] `line_items[]` with quantity.total/fulfilled derivation
+    - [x] `fulfillment.expectations[]` from shipping lines
+    - [x] `fulfillment.events[]` from order notes (tracking info)
+    - [x] `adjustments[]` from WC refunds
+    - [x] `totals[]` (subtotal, shipping, tax, discount, total)
+    - [x] Line item status derivation (processing/partial/fulfilled)
+  - [x] `permalink_url` construction
 - [ ] **3.2** Order event webhook (outbound)
   - [ ] WooCommerce webhook listener → transform to UCP order event
   - [ ] POST to platform's `webhook_url` (from capability config)
   - [ ] Request-Signature header (detached JWT, RFC 7797)
   - [ ] Retry logic for failed deliveries
-- [ ] **3.3** Tests for Phase 3
+- [x] **3.3** Tests for Phase 3
 
 ### Phase 4: A2UI Card Rendering
 _Goal: Rich UI cards in tool responses_
 
-- [ ] **4.1** Implement `a2ui.go` — builder helpers
-  - [ ] `Surface` struct with component adjacency list
-  - [ ] `AddComponent(id, componentType, props)` builder
-  - [ ] `SetData(path, contents)` data model builder
-  - [ ] `Render(rootID, catalogID)` → JSONL output (surfaceUpdate + dataModelUpdate + beginRendering)
-  - [ ] `BoundValue` helpers: `Literal(v)`, `Path(p)`, `LiteralAndPath(v, p)`
-- [ ] **4.2** Implement `a2ui_cards.go` — commerce cards
-  - [ ] `ProductCard(product)` — image, title, price, stock, description, add-to-cart button
-  - [ ] `ProductListCard(products)` — scrollable list with template binding
-  - [ ] `CheckoutCard(checkout)` — line items, totals, buyer info, action buttons
-  - [ ] `OrderCard(order)` — status, items, fulfillment timeline, adjustments
+- [x] **4.1** Implement `a2ui.go` — builder helpers
+  - [x] `Surface` struct with component adjacency list
+  - [x] `AddComponent(id, componentType, props)` builder
+  - [x] `SetData(path, contents)` data model builder
+  - [x] `Render(rootID, catalogID)` → JSONL output (surfaceUpdate + dataModelUpdate + beginRendering)
+  - [x] `BoundValue` helpers: `Literal(v)`, `Path(p)`, `LiteralAndPath(v, p)`
+- [x] **4.2** Implement `a2ui_cards.go` — commerce cards
+  - [x] `ProductCard(product)` — image, title, price, stock, description, add-to-cart button
+  - [x] `ProductListCard(products)` — scrollable list with template binding
+  - [x] `CheckoutCard(checkout)` — line items, totals, buyer info, action buttons
+  - [x] `OrderCard(order)` — status, items, fulfillment timeline, adjustments
   - [ ] `OrderListCard(orders)` — list of order summaries
 - [ ] **4.3** Integrate A2UI into tool responses
   - [ ] When `a2ui_enabled`, attach A2UI JSONL as additional content in `CallToolResult`
   - [ ] Embed as `mcp.EmbeddedResource` with `mimeType: "application/json+a2ui"`
   - [ ] Maintain backward compat: plain text content always present
-- [ ] **4.4** Tests for Phase 4
+- [x] **4.4** Tests for Phase 4
 
 ### Phase 5: HTTP Transport & REST Endpoints
 _Goal: Streamable HTTP MCP + UCP REST API_
 
-- [ ] **5.1** HTTP server setup in `main.go`
-  - [ ] Conditional HTTP listener based on `transport` config
-  - [ ] Route multiplexer (stdlib `net/http`)
-- [ ] **5.2** MCP Streamable HTTP transport
-  - [ ] Mount at `/ucp/mcp`
-  - [ ] Use go-sdk's `StreamableHTTPTransport`
-- [ ] **5.3** UCP Profile endpoint
-  - [ ] `GET /.well-known/ucp` → profile JSON
+- [x] **5.1** HTTP server setup in `main.go`
+  - [x] Conditional HTTP listener based on `transport` config
+  - [x] Route multiplexer (stdlib `net/http`)
+- [x] **5.2** MCP Streamable HTTP transport
+  - [x] Mount at `/ucp/mcp`
+  - [x] Use go-sdk's `StreamableHTTPTransport`
+- [x] **5.3** UCP Profile endpoint
+  - [x] `GET /.well-known/ucp` → profile JSON
   - [ ] Dynamic capability list from config
-- [ ] **5.4** REST endpoints in `rest.go`
-  - [ ] `POST /ucp/v1/checkout-sessions` → calls checkout handler
-  - [ ] `GET /ucp/v1/checkout-sessions/{id}`
-  - [ ] `PATCH /ucp/v1/checkout-sessions/{id}`
-  - [ ] `POST /ucp/v1/checkout-sessions/{id}/complete`
-  - [ ] `POST /ucp/v1/checkout-sessions/{id}/cancel`
-  - [ ] `GET /ucp/v1/orders/{id}`
-  - [ ] `GET /ucp/v1/products?query=&category=&min_price=&max_price=`
-  - [ ] `GET /ucp/v1/products/{id}`
+- [x] **5.4** REST endpoints in `rest.go`
+  - [x] `POST /ucp/v1/checkout-sessions` → calls checkout handler
+  - [x] `GET /ucp/v1/checkout-sessions/{id}`
+  - [x] `PATCH /ucp/v1/checkout-sessions/{id}`
+  - [x] `POST /ucp/v1/checkout-sessions/{id}/complete`
+  - [x] `POST /ucp/v1/checkout-sessions/{id}/cancel`
+  - [x] `GET /ucp/v1/orders/{id}`
+  - [x] `GET /ucp/v1/products?query=&category=&min_price=&max_price=`
+  - [x] `GET /ucp/v1/products/{id}`
   - [ ] `UCP-Agent` header parsing
-  - [ ] JSON error responses matching UCP error schema
-- [ ] **5.5** Tests for Phase 5
+  - [x] JSON error responses matching UCP error schema
+- [x] **5.5** Tests for Phase 5
 
 ### Phase 6: Identity Linking (Future)
 _Goal: OAuth 2.0 customer account linking_
