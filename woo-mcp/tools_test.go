@@ -18,7 +18,8 @@ func setupToolTest(t *testing.T, handler http.Handler, storeURL string) *mcp.Cli
 
 	wc := NewWooClient(ts.URL, "ck", "cs")
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0.1"}, nil)
-	RegisterTools(s, wc, storeURL)
+	cfg := &Config{StoreURL: storeURL, UCPEnabled: true}
+	RegisterTools(s, wc, cfg)
 
 	t1, t2 := mcp.NewInMemoryTransports()
 	if _, err := s.Connect(context.Background(), t1, nil); err != nil {

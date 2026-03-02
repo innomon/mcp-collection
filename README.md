@@ -46,6 +46,24 @@ Frappe ERP MCP server with CRUD and DocType contract tooling.
   - `FRAPPE_ALLOWED_DOCTYPES`
   - `FRAPPE_ENV`, `FRAPPE_MCP_DELETE_APPROVAL_TOKEN`
 
+### woo-mcp
+
+WooCommerce MCP+UCP server exposing WooCommerce capabilities via both MCP (for AI agents) and REST (for direct platform integration), with A2UI card rendering.
+
+- **Transports**: `stdio` (default), `http`, or `both`
+- **UCP Capabilities**: Shopping discovery, checkout, order, fulfillment
+- **MCP Tools** (legacy):
+  - `search_products`, `get_order_history`, `checkout`, `raise_issue`
+- **UCP MCP Tools** (when `ucp_enabled: true`):
+  - Discovery: `search_shop_catalog`, `get_product`, `get_product_categories`, `search_shop_policies_and_faqs`
+  - Checkout: `create_checkout`, `get_checkout`, `update_checkout`, `complete_checkout`, `cancel_checkout`
+  - Order: `get_order`, `list_orders`
+- **REST Endpoints** (when `transport` is `http` or `both`):
+  - `GET /.well-known/ucp` — UCP business profile
+  - `GET/POST/PATCH /ucp/v1/checkout-sessions`, `/ucp/v1/products`, `/ucp/v1/orders`
+- **A2UI Cards**: Product, checkout, and order cards (when `a2ui_enabled: true`)
+- **Config**: `config.yaml` with `store_url`, `consumer_key`, `consumer_secret`, `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`
+
 ## Database Schema
 
 Both memory servers use the same PostgreSQL schema:

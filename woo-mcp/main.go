@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,19 +30,45 @@ func main() {
 	}, nil)
 
 	wc := NewWooClient(cfg.StoreURL, cfg.ConsumerKey, cfg.ConsumerSecret)
-	RegisterTools(s, wc, cfg.StoreURL)
+	RegisterTools(s, wc, cfg)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	ss, err := s.Connect(ctx, &mcp.StdioTransport{}, nil)
-	if err != nil {
-		log.Fatalf("failed to start server: %v", err)
+	if cfg.Transport == "http" || cfg.Transport == "both" {
+		httpMux := http.NewServeMux()
+
+		rest := NewRESTServer(wc, cfg)
+		rest.RegisterRoutes(httpMux)
+
+		httpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+			return s
+		}, nil)
+		httpMux.Handle("/ucp/mcp", httpHandler)
+
+		addr := fmt.Sprintf(":%d", cfg.HTTPPort)
+		httpServer := &http.Server{Addr: addr, Handler: httpMux}
+
+		go func() {
+			log.Printf("HTTP server listening on %s", addr)
+			if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("HTTP server error: %v", err)
+			}
+		}()
+
+		defer httpServer.Close()
 	}
 
-	log.Printf("%s %s started", cfg.ServerName, cfg.ServerVersion)
+	if cfg.Transport == "stdio" || cfg.Transport == "both" {
+		ss, err := s.Connect(ctx, &mcp.StdioTransport{}, nil)
+		if err != nil {
+			log.Fatalf("failed to start server: %v", err)
+		}
+		defer ss.Close()
+	}
+
+	log.Printf("%s %s started (transport=%s)", cfg.ServerName, cfg.ServerVersion, cfg.Transport)
 
 	<-ctx.Done()
-	ss.Close()
 	log.Println("server shut down")
 }

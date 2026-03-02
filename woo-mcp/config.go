@@ -13,8 +13,13 @@ type Config struct {
 	ConsumerKey    string `yaml:"consumer_key"`
 	ConsumerSecret string `yaml:"consumer_secret"`
 	PublicKeyPath  string `yaml:"public_key_path"`
-	ServerName     string `yaml:"server_name"`
-	ServerVersion  string `yaml:"server_version"`
+	ServerName           string `yaml:"server_name"`
+	ServerVersion        string `yaml:"server_version"`
+	Transport            string `yaml:"transport"`               // "stdio" | "http" | "both"
+	HTTPPort             int    `yaml:"http_port"`               // port for HTTP transport
+	UCPEnabled           bool   `yaml:"ucp_enabled"`             // enable UCP profile + REST endpoints
+	A2UIEnabled          bool   `yaml:"a2ui_enabled"`            // enable A2UI card generation
+	StorePoliciesPageIDs []int  `yaml:"store_policies_page_ids"` // WordPress page IDs for policies
 }
 
 func LoadConfig(args []string) (*Config, error) {
@@ -38,6 +43,12 @@ func LoadConfig(args []string) (*Config, error) {
 	}
 	if cfg.ServerVersion == "" {
 		cfg.ServerVersion = "1.0.0"
+	}
+	if cfg.Transport == "" {
+		cfg.Transport = "stdio"
+	}
+	if cfg.HTTPPort == 0 {
+		cfg.HTTPPort = 8080
 	}
 
 	return &cfg, nil

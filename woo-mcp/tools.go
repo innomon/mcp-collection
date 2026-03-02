@@ -9,7 +9,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func RegisterTools(s *mcp.Server, client *WooClient, storeURL string) {
+func RegisterTools(s *mcp.Server, client *WooClient, cfg *Config) {
+	storeURL := cfg.StoreURL
+
 	s.AddTool(&mcp.Tool{
 		Name:        "search_products",
 		Description: "Search for products in the store",
@@ -94,6 +96,84 @@ func RegisterTools(s *mcp.Server, client *WooClient, storeURL string) {
 			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Issue raised on order %d: %s (note ID: %d)", args.OrderID, note.Note, note.ID)}},
 		}, nil
 	})
+
+	if cfg.UCPEnabled {
+		registerUCPDiscoveryTools(s, client)
+		registerUCPCheckoutTools(s, client, storeURL)
+		registerUCPOrderTools(s, client, storeURL)
+	}
+}
+
+func registerUCPDiscoveryTools(s *mcp.Server, client *WooClient) {
+	s.AddTool(&mcp.Tool{
+		Name:        "search_shop_catalog",
+		Description: "Search for products in the store with context-aware ranking",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search terms"},"context":{"type":"string","description":"Buyer context for ranking"},"category":{"type":"string","description":"Filter by category slug"},"min_price":{"type":"number","description":"Minimum price filter"},"max_price":{"type":"number","description":"Maximum price filter"},"per_page":{"type":"integer","description":"Results per page (default 10)"}},"required":["query","context"]}`),
+	}, handleSearchShopCatalog(client))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "get_product",
+		Description: "Get detailed product information including variants",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Product ID"}},"required":["id"]}`),
+	}, handleGetProduct(client))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "get_product_categories",
+		Description: "List all product categories",
+		InputSchema: json.RawMessage(`{"type":"object"}`),
+	}, handleGetProductCategories(client))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "search_shop_policies_and_faqs",
+		Description: "Search store policies and FAQ pages",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query for policies"}},"required":["query"]}`),
+	}, handleSearchShopPolicies(client))
+}
+
+func registerUCPCheckoutTools(s *mcp.Server, client *WooClient, storeURL string) {
+	s.AddTool(&mcp.Tool{
+		Name:        "create_checkout",
+		Description: "Create a new checkout session",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"line_items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string","description":"Product ID"},"quantity":{"type":"integer","description":"Quantity"}},"required":["item_id","quantity"]}},"buyer":{"type":"object","properties":{"email":{"type":"string"},"first_name":{"type":"string"},"last_name":{"type":"string"}}},"currency":{"type":"string","description":"Currency code (default USD)"}},"required":["line_items"]}`),
+	}, handleCreateCheckout(client, storeURL))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "get_checkout",
+		Description: "Get checkout session details",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"}},"required":["id"]}`),
+	}, handleGetCheckout(client, storeURL))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "update_checkout",
+		Description: "Update checkout session (line items, buyer info)",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"},"line_items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string"},"quantity":{"type":"integer"}},"required":["item_id","quantity"]}},"buyer":{"type":"object","properties":{"email":{"type":"string"},"first_name":{"type":"string"},"last_name":{"type":"string"}}}},"required":["id"]}`),
+	}, handleUpdateCheckout(client, storeURL))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "complete_checkout",
+		Description: "Complete checkout — returns payment redirect URL",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"}},"required":["id"]}`),
+	}, handleCompleteCheckout(client, storeURL))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "cancel_checkout",
+		Description: "Cancel a checkout session",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"}},"required":["id"]}`),
+	}, handleCancelCheckout(client, storeURL))
+}
+
+func registerUCPOrderTools(s *mcp.Server, client *WooClient, storeURL string) {
+	s.AddTool(&mcp.Tool{
+		Name:        "get_order",
+		Description: "Get order details with fulfillment tracking and adjustments",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Order ID"}},"required":["id"]}`),
+	}, handleGetOrder(client, storeURL))
+
+	s.AddTool(&mcp.Tool{
+		Name:        "list_orders",
+		Description: "List recent orders",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"per_page":{"type":"integer","description":"Number of orders to return (default 10)"}}}`),
+	}, handleListOrders(client, storeURL))
 }
 
 func mapOrderStatus(status string) string {

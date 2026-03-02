@@ -2,6 +2,8 @@
 mpcpgmem
 mcp2mcpmem
 mcpfrp
+woo-mcp/woo-mcp
+
 
 # IDE
 .idea/

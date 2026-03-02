@@ -13,3 +13,18 @@ public_key_path: "/path/to/public_key.pem"
 # MCP server identification (optional, defaults shown)
 server_name: "WooCommerce-MCP"
 server_version: "1.0.0"
+
+# Transport mode: "stdio" | "http" | "both"
+transport: "stdio"
+
+# HTTP server port (used when transport is "http" or "both")
+http_port: 8080
+
+# Enable UCP profile and REST endpoints
+ucp_enabled: true
+
+# Enable A2UI card rendering in tool responses
+a2ui_enabled: true
+
+# WordPress page IDs containing store policies (optional)
+store_policies_page_ids: []
