@@ -98,24 +98,24 @@ func RegisterTools(s *mcp.Server, client *WooClient, cfg *Config) {
 	})
 
 	if cfg.UCPEnabled {
-		registerUCPDiscoveryTools(s, client)
-		registerUCPCheckoutTools(s, client, storeURL)
-		registerUCPOrderTools(s, client, storeURL)
+		registerUCPDiscoveryTools(s, client, cfg.A2UIEnabled)
+		registerUCPCheckoutTools(s, client, storeURL, cfg.A2UIEnabled)
+		registerUCPOrderTools(s, client, storeURL, cfg.A2UIEnabled)
 	}
 }
 
-func registerUCPDiscoveryTools(s *mcp.Server, client *WooClient) {
+func registerUCPDiscoveryTools(s *mcp.Server, client *WooClient, a2uiEnabled bool) {
 	s.AddTool(&mcp.Tool{
 		Name:        "search_shop_catalog",
 		Description: "Search for products in the store with context-aware ranking",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search terms"},"context":{"type":"string","description":"Buyer context for ranking"},"category":{"type":"string","description":"Filter by category slug"},"min_price":{"type":"number","description":"Minimum price filter"},"max_price":{"type":"number","description":"Maximum price filter"},"per_page":{"type":"integer","description":"Results per page (default 10)"}},"required":["query","context"]}`),
-	}, handleSearchShopCatalog(client))
+	}, handleSearchShopCatalog(client, a2uiEnabled))
 
 	s.AddTool(&mcp.Tool{
 		Name:        "get_product",
 		Description: "Get detailed product information including variants",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Product ID"}},"required":["id"]}`),
-	}, handleGetProduct(client))
+	}, handleGetProduct(client, a2uiEnabled))
 
 	s.AddTool(&mcp.Tool{
 		Name:        "get_product_categories",
@@ -130,50 +130,50 @@ func registerUCPDiscoveryTools(s *mcp.Server, client *WooClient) {
 	}, handleSearchShopPolicies(client))
 }
 
-func registerUCPCheckoutTools(s *mcp.Server, client *WooClient, storeURL string) {
+func registerUCPCheckoutTools(s *mcp.Server, client *WooClient, storeURL string, a2uiEnabled bool) {
 	s.AddTool(&mcp.Tool{
 		Name:        "create_checkout",
 		Description: "Create a new checkout session",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"line_items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string","description":"Product ID"},"quantity":{"type":"integer","description":"Quantity"}},"required":["item_id","quantity"]}},"buyer":{"type":"object","properties":{"email":{"type":"string"},"first_name":{"type":"string"},"last_name":{"type":"string"}}},"currency":{"type":"string","description":"Currency code (default USD)"}},"required":["line_items"]}`),
-	}, handleCreateCheckout(client, storeURL))
+	}, handleCreateCheckout(client, storeURL, a2uiEnabled))
 
 	s.AddTool(&mcp.Tool{
 		Name:        "get_checkout",
 		Description: "Get checkout session details",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"}},"required":["id"]}`),
-	}, handleGetCheckout(client, storeURL))
+	}, handleGetCheckout(client, storeURL, a2uiEnabled))
 
 	s.AddTool(&mcp.Tool{
 		Name:        "update_checkout",
 		Description: "Update checkout session (line items, buyer info)",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"},"line_items":{"type":"array","items":{"type":"object","properties":{"item_id":{"type":"string"},"quantity":{"type":"integer"}},"required":["item_id","quantity"]}},"buyer":{"type":"object","properties":{"email":{"type":"string"},"first_name":{"type":"string"},"last_name":{"type":"string"}}}},"required":["id"]}`),
-	}, handleUpdateCheckout(client, storeURL))
+	}, handleUpdateCheckout(client, storeURL, a2uiEnabled))
 
 	s.AddTool(&mcp.Tool{
 		Name:        "complete_checkout",
 		Description: "Complete checkout — returns payment redirect URL",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"}},"required":["id"]}`),
-	}, handleCompleteCheckout(client, storeURL))
+	}, handleCompleteCheckout(client, storeURL, a2uiEnabled))
 
 	s.AddTool(&mcp.Tool{
 		Name:        "cancel_checkout",
 		Description: "Cancel a checkout session",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Checkout/order ID"}},"required":["id"]}`),
-	}, handleCancelCheckout(client, storeURL))
+	}, handleCancelCheckout(client, storeURL, a2uiEnabled))
 }
 
-func registerUCPOrderTools(s *mcp.Server, client *WooClient, storeURL string) {
+func registerUCPOrderTools(s *mcp.Server, client *WooClient, storeURL string, a2uiEnabled bool) {
 	s.AddTool(&mcp.Tool{
 		Name:        "get_order",
 		Description: "Get order details with fulfillment tracking and adjustments",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"id":{"type":"string","description":"Order ID"}},"required":["id"]}`),
-	}, handleGetOrder(client, storeURL))
+	}, handleGetOrder(client, storeURL, a2uiEnabled))
 
 	s.AddTool(&mcp.Tool{
 		Name:        "list_orders",
 		Description: "List recent orders",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"per_page":{"type":"integer","description":"Number of orders to return (default 10)"}}}`),
-	}, handleListOrders(client, storeURL))
+	}, handleListOrders(client, storeURL, a2uiEnabled))
 }
 
 func mapOrderStatus(status string) string {

@@ -27,7 +27,7 @@ type SearchPoliciesInput struct {
 	Query string `json:"query"`
 }
 
-func handleSearchShopCatalog(client *WooClient) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleSearchShopCatalog(client *WooClient, a2uiEnabled bool) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args SearchCatalogInput
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
@@ -92,13 +92,15 @@ func handleSearchShopCatalog(client *WooClient) func(ctx context.Context, req *m
 		if err != nil {
 			return nil, fmt.Errorf("marshal catalog results: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(ProductListCard(products)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }
 
-func handleGetProduct(client *WooClient) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleGetProduct(client *WooClient, a2uiEnabled bool) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args GetProductInput
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
@@ -195,9 +197,11 @@ func handleGetProduct(client *WooClient) func(ctx context.Context, req *mcp.Call
 		if err != nil {
 			return nil, fmt.Errorf("marshal product result: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(ProductCard(*product)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }
 

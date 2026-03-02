@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // Surface represents an A2UI surface with components and data.
@@ -103,4 +106,20 @@ func BoundPath(p string) map[string]any {
 // BoundLiteralAndPath creates a bound value with both a literal fallback and a path.
 func BoundLiteralAndPath(v string, p string) map[string]any {
 	return map[string]any{"literalString": v, "path": p}
+}
+
+// a2uiToEmbeddedResource converts A2UI JSONL lines into an mcp.EmbeddedResource
+// suitable for inclusion in a CallToolResult.Content slice.
+func a2uiToEmbeddedResource(lines []json.RawMessage) *mcp.EmbeddedResource {
+	var parts []string
+	for _, line := range lines {
+		parts = append(parts, string(line))
+	}
+	return &mcp.EmbeddedResource{
+		Resource: &mcp.ResourceContents{
+			URI:      "a2ui://surface",
+			MIMEType: "application/json+a2ui",
+			Text:     strings.Join(parts, "\n"),
+		},
+	}
 }

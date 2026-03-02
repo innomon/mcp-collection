@@ -190,7 +190,7 @@ func mapOrderToUCPCheckout(order *Order, storeURL string) *UCPCheckout {
 
 // --- Tool Handlers ---
 
-func handleCreateCheckout(client *WooClient, storeURL string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleCreateCheckout(client *WooClient, storeURL string, a2uiEnabled bool) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input CreateCheckoutInput
 		if err := json.Unmarshal(req.Params.Arguments, &input); err != nil {
@@ -238,13 +238,15 @@ func handleCreateCheckout(client *WooClient, storeURL string) func(context.Conte
 		if err != nil {
 			return nil, fmt.Errorf("marshal checkout: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(CheckoutCard(*checkout)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }
 
-func handleGetCheckout(client *WooClient, storeURL string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleGetCheckout(client *WooClient, storeURL string, a2uiEnabled bool) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {
 			ID string `json:"id"`
@@ -268,13 +270,15 @@ func handleGetCheckout(client *WooClient, storeURL string) func(context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("marshal checkout: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(CheckoutCard(*checkout)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }
 
-func handleUpdateCheckout(client *WooClient, storeURL string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleUpdateCheckout(client *WooClient, storeURL string, a2uiEnabled bool) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input UpdateCheckoutInput
 		if err := json.Unmarshal(req.Params.Arguments, &input); err != nil {
@@ -328,13 +332,15 @@ func handleUpdateCheckout(client *WooClient, storeURL string) func(context.Conte
 		if err != nil {
 			return nil, fmt.Errorf("marshal checkout: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(CheckoutCard(*checkout)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }
 
-func handleCompleteCheckout(client *WooClient, storeURL string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleCompleteCheckout(client *WooClient, storeURL string, a2uiEnabled bool) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {
 			ID string `json:"id"`
@@ -359,13 +365,15 @@ func handleCompleteCheckout(client *WooClient, storeURL string) func(context.Con
 		if err != nil {
 			return nil, fmt.Errorf("marshal checkout: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(CheckoutCard(*checkout)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }
 
-func handleCancelCheckout(client *WooClient, storeURL string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleCancelCheckout(client *WooClient, storeURL string, a2uiEnabled bool) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {
 			ID string `json:"id"`
@@ -391,8 +399,10 @@ func handleCancelCheckout(client *WooClient, storeURL string) func(context.Conte
 		if err != nil {
 			return nil, fmt.Errorf("marshal checkout: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(CheckoutCard(*checkout)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }

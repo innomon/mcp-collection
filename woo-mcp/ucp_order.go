@@ -155,7 +155,7 @@ func orderStatusToLineItemStatus(status string) string {
 	}
 }
 
-func handleGetOrder(client *WooClient, storeURL string) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleGetOrder(client *WooClient, storeURL string, a2uiEnabled bool) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var input struct {
 			ID string `json:"id"`
@@ -186,13 +186,15 @@ func handleGetOrder(client *WooClient, storeURL string) func(ctx context.Context
 		if err != nil {
 			return nil, fmt.Errorf("marshal ucp order: %w", err)
 		}
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
-		}, nil
+		content := []mcp.Content{&mcp.TextContent{Text: string(data)}}
+		if a2uiEnabled {
+			content = append(content, a2uiToEmbeddedResource(OrderCard(*ucpOrder)))
+		}
+		return &mcp.CallToolResult{Content: content}, nil
 	}
 }
 
-func handleListOrders(client *WooClient, storeURL string) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleListOrders(client *WooClient, storeURL string, a2uiEnabled bool) func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	type ListOrdersInput struct {
 		PerPage int `json:"per_page,omitempty"`
 	}

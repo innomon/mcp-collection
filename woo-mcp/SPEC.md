@@ -488,10 +488,10 @@ _Goal: Rich UI cards in tool responses_
   - [x] `CheckoutCard(checkout)` — line items, totals, buyer info, action buttons
   - [x] `OrderCard(order)` — status, items, fulfillment timeline, adjustments
   - [ ] `OrderListCard(orders)` — list of order summaries
-- [ ] **4.3** Integrate A2UI into tool responses
-  - [ ] When `a2ui_enabled`, attach A2UI JSONL as additional content in `CallToolResult`
-  - [ ] Embed as `mcp.EmbeddedResource` with `mimeType: "application/json+a2ui"`
-  - [ ] Maintain backward compat: plain text content always present
+- [x] **4.3** Integrate A2UI into tool responses
+  - [x] When `a2ui_enabled`, attach A2UI JSONL as additional content in `CallToolResult`
+  - [x] Embed as `mcp.EmbeddedResource` with `mimeType: "application/json+a2ui"`
+  - [x] Maintain backward compat: plain text content always present
 - [x] **4.4** Tests for Phase 4
 
 ### Phase 5: HTTP Transport & REST Endpoints
