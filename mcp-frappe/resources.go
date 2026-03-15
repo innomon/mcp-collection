@@ -46,10 +46,46 @@ func registerResources(server *mcp.Server, client *FrappeClient, cfg Config) {
 		if strings.HasPrefix(uri, "frappe://doctype/") {
 			trimmed := strings.TrimPrefix(uri, "frappe://doctype/")
 			parts := strings.Split(trimmed, "/")
-			if len(parts) == 0 || parts[0] == "" {
-				return nil, fmt.Errorf("invalid doctype resource URI")
+			docType := ""
+			if len(parts) > 0 {
+				docType = parts[0]
 			}
-			docType := parts[0]
+
+			if docType == "" {
+				if SupportsElicitationFromRead(req, "form") {
+					// Fetch list of DocTypes for selection
+					dtList, _ := client.GetDocTypes(ctx)
+					options := []string{}
+					if m, ok := dtList.(map[string]any); ok {
+						if data, ok := m["data"].([]any); ok {
+							for _, item := range data {
+								if row, ok := item.(map[string]any); ok {
+									if n, ok := row["name"].(string); ok {
+										if isDocTypeAllowed(cfg.AllowedDocTypes, n) {
+											options = append(options, n)
+										}
+									}
+								}
+							}
+						}
+					}
+
+					builder := &ElicitationBuilder{}
+					elicit := builder.BuildElicitParams("Please select a DocType to view its metadata.", []FrappeField{
+						{
+							Fieldname: "name",
+							Label:     "DocType Name",
+							Fieldtype: "Select",
+							Options:   &[]string{strings.Join(options, "\n")}[0],
+							Reqd:      true,
+						},
+					})
+					return &mcp.ReadResourceResult{
+						Meta: mcp.Meta{"elicitation": elicit},
+					}, nil
+				}
+				return nil, fmt.Errorf("invalid doctype resource URI: name is missing")
+			}
 
 			meta, err := getDocTypeMeta(ctx, client, docType)
 			if err != nil {

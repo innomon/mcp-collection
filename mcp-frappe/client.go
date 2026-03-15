@@ -38,7 +38,16 @@ func (c *FrappeClient) Do(ctx context.Context, method, path string, body []byte)
 	}
 
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("frappe error (%d): %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		var fErr FrappeError
+		if err := json.Unmarshal(respBody, &fErr); err == nil {
+			fErr.StatusCode = resp.StatusCode
+			fErr.Raw = string(respBody)
+			return "", &fErr
+		}
+		return "", &FrappeError{
+			StatusCode: resp.StatusCode,
+			Raw:        strings.TrimSpace(string(respBody)),
+		}
 	}
 	return string(respBody), nil
 }
@@ -68,7 +77,16 @@ func (c *FrappeClient) CallMethod(ctx context.Context, method string, params url
 	}
 
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("frappe error (%d): %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		var fErr FrappeError
+		if err := json.Unmarshal(respBody, &fErr); err == nil {
+			fErr.StatusCode = resp.StatusCode
+			fErr.Raw = string(respBody)
+			return "", &fErr
+		}
+		return "", &FrappeError{
+			StatusCode: resp.StatusCode,
+			Raw:        strings.TrimSpace(string(respBody)),
+		}
 	}
 	return string(respBody), nil
 }

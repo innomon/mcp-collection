@@ -253,6 +253,32 @@ Feature is production-safe, measurable, and can be rolled out incrementally.
 - [x] Observability hooks are live.
 - [x] Rollout evidence documented.
 
+## Phase 6: MCP Interactive Enhancements ✅ (Est. 1-2 days)
+
+## Epic Outcome
+
+MCP server provides high-fidelity interactive UX via autocompletion and elicitation.
+
+## Tasks
+
+- [x] Implement dynamic completions for DocTypes and records (S)
+  - Acceptance: `completion/complete` returns suggestions based on prefix and allowlist.
+  - Done: `completions.go` implements prefix-based search for tools and resource templates.
+- [x] Implement form elicitation for missing mandatory fields (S)
+  - Acceptance: `frappe_create_record` triggers elicitation on `MandatoryError`.
+  - Done: `elicitation.go` and `tools.go` updated to use `ElicitationBuilder`.
+- [x] Implement production delete approval elicitation (S)
+  - Acceptance: `frappe_delete_record` triggers password elicitation in production.
+  - Done: Production delete flow triggers elicitation for `approval_token`.
+- [x] Implement resource template parameter elicitation (S)
+  - Acceptance: `frappe://doctype/` triggers DocType selection.
+  - Done: `resources.go` updated with resource-level elicitation.
+
+## Exit Criteria
+
+- [x] Automated tests verify completion and elicitation metadata.
+- [x] Server version bumped to 1.2.0.
+
 ## Cross-Cutting Non-Functional Checklist
 
 - [ ] Sensitive logging review complete (credentials and sensitive payload redaction validated).
@@ -276,9 +302,11 @@ Feature is production-safe, measurable, and can be rolled out incrementally.
 9. ~~`FRAPPE-08`: Integration tests for degrade/fallback behavior (Phase 4) - 3 points~~ ✅
 10. ~~`FRAPPE-09`: Observability + rollout controls (Phase 5) - 3 points~~ ✅
 11. ~~`FRAPPE-10`: Staging soak + canary signoff report (Phase 5) - 2 points~~ ✅
+12. ~~`FRAPPE-11`: MCP Completions (Phase 6) - 2 points~~ ✅
+13. ~~`FRAPPE-12`: MCP Elicitation (Phase 6) - 3 points~~ ✅
 
 ## Estimated Total
 
 - Remaining: ~0 points. All phases complete.
-- Completed: ~39 points (Phases 0-5).
+- Completed: ~44 points (Phases 0-6).
 - Original scope reduced by consolidating MCP CRUD into backend adapter (eliminated transport parity testing and MCP deployment dependency).

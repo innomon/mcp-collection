@@ -28,10 +28,13 @@ func main() {
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "frappe-mcp",
-		Version: "1.1.0",
+		Version: "1.2.0", // Bump version to 1.2.0 for elicitation support
 	}, &mcp.ServerOptions{
 		Capabilities: &mcp.ServerCapabilities{
 			Completions: &mcp.CompletionCapabilities{},
+			Experimental: map[string]any{
+				"elicitation": map[string]any{},
+			},
 		},
 		CompletionHandler: newCompletionHandler(client, cfg),
 	})

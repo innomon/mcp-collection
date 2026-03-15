@@ -1,6 +1,9 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // FrappeDocType is the normalized representation of a Frappe DocType
 // used by the A2UI schema-selection pipeline. This is distinct from
@@ -85,4 +88,23 @@ type PipelineConfig struct {
 	ConfidenceThreshold float64
 	FallbackSchema      string
 	MaxCandidates       int
+}
+
+// FrappeError is the structured error response from Frappe
+type FrappeError struct {
+	ExcType        string   `json:"exc_type,omitempty"`
+	Exception      string   `json:"exception,omitempty"`
+	ServerMessages string   `json:"_server_messages,omitempty"`
+	StatusCode     int      `json:"status_code,omitempty"`
+	Raw            string   `json:"raw,omitempty"`
+}
+
+func (e *FrappeError) Error() string {
+	if e.Exception != "" {
+		return fmt.Sprintf("frappe error (%d): %s", e.StatusCode, e.Exception)
+	}
+	if e.ExcType != "" {
+		return fmt.Sprintf("frappe error (%d): %s", e.StatusCode, e.ExcType)
+	}
+	return fmt.Sprintf("frappe error (%d): %s", e.StatusCode, e.Raw)
 }

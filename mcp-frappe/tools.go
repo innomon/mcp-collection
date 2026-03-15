@@ -27,55 +27,55 @@ type DeleteResponse struct {
 }
 
 type DeleteRecordArgs struct {
-	DocType       string `json:"doctype" jsonschema:"description=The Frappe DocType"`
-	Name          string `json:"name" jsonschema:"description=The unique record name"`
-	DryRun        bool   `json:"dry_run" jsonschema:"description=If true, validates policy and returns delete intent without deleting"`
-	ApprovalToken string `json:"approval_token,omitempty" jsonschema:"description=Required for live delete in production"`
+	DocType       string `json:"doctype" jsonschema:"The Frappe DocType"`
+	Name          string `json:"name" jsonschema:"The unique record name"`
+	DryRun        bool   `json:"dry_run" jsonschema:"If true, validates policy and returns delete intent without deleting"`
+	ApprovalToken string `json:"approval_token,omitempty" jsonschema:"Required for live delete in production"`
 }
 
 type DocTypeMetaArgs struct {
-	DocType string `json:"doctype" jsonschema:"description=The Frappe DocType to fetch metadata for"`
+	DocType string `json:"doctype" jsonschema:"The Frappe DocType to fetch metadata for"`
 }
 
 type GenerateDocTypeJSONArgs struct {
-	DocType        string         `json:"doctype" jsonschema:"description=The Frappe DocType to normalize"`
-	SourceMetadata map[string]any `json:"source_metadata,omitempty" jsonschema:"description=Optional raw metadata payload. If omitted, metadata is fetched from Frappe"`
+	DocType        string         `json:"doctype" jsonschema:"The Frappe DocType to normalize"`
+	SourceMetadata map[string]any `json:"source_metadata,omitempty" jsonschema:"Optional raw metadata payload. If omitted, metadata is fetched from Frappe"`
 }
 
 type ValidateDocTypeJSONArgs struct {
-	DocTypeJSON map[string]any `json:"doctype_json" jsonschema:"description=DocType JSON payload generated from the canonical contract"`
+	DocTypeJSON map[string]any `json:"doctype_json" jsonschema:"DocType JSON payload generated from the canonical contract"`
 }
 
 type SearchArgs struct {
-	DocType string `json:"doctype" jsonschema:"description=The Frappe DocType to search (e.g. Customer)"`
-	Filters string `json:"filters" jsonschema:"description=JSON list of filters, e.g. [['name', 'like', '%John%']]"`
-	Fields  string `json:"fields" jsonschema:"description=JSON list of fields to return, e.g. ['name', 'email_id']"`
+	DocType string `json:"doctype" jsonschema:"The Frappe DocType to search (e.g. Customer)"`
+	Filters string `json:"filters" jsonschema:"JSON list of filters, e.g. [['name', 'like', '%John%']]"`
+	Fields  string `json:"fields" jsonschema:"JSON list of fields to return, e.g. ['name', 'email_id']"`
 }
 
 type GetRecordArgs struct {
-	DocType string `json:"doctype" jsonschema:"description=The Frappe DocType"`
-	Name    string `json:"name" jsonschema:"description=The unique record name"`
+	DocType string `json:"doctype" jsonschema:"The Frappe DocType"`
+	Name    string `json:"name" jsonschema:"The unique record name"`
 }
 
 type CreateRecordArgs struct {
-	DocType string         `json:"doctype" jsonschema:"description=The Frappe DocType"`
-	DocJSON map[string]any `json:"doc_json" jsonschema:"description=The document fields to create"`
+	DocType string         `json:"doctype" jsonschema:"The Frappe DocType"`
+	DocJSON map[string]any `json:"doc_json" jsonschema:"The document fields to create"`
 }
 
 type UpdateRecordArgs struct {
-	DocType    string         `json:"doctype" jsonschema:"description=The Frappe DocType"`
-	Name       string         `json:"name" jsonschema:"description=The unique record name"`
-	UpdateJSON map[string]any `json:"update_json" jsonschema:"description=The fields to update"`
+	DocType    string         `json:"doctype" jsonschema:"The Frappe DocType"`
+	Name       string         `json:"name" jsonschema:"The unique record name"`
+	UpdateJSON map[string]any `json:"update_json" jsonschema:"The fields to update"`
 }
 
 type MapDocTypeToCandidatesArgs struct {
-	DocType string `json:"doctype" jsonschema:"description=The Frappe DocType to map to schema candidates"`
+	DocType string `json:"doctype" jsonschema:"The Frappe DocType to map to schema candidates"`
 }
 
 type SelectSchemaArgs struct {
-	DocType          string            `json:"doctype" jsonschema:"description=The Frappe DocType to use for candidate generation"`
-	Content          string            `json:"content" jsonschema:"description=The agent response content to select a schema for"`
-	StaticCandidates []SchemaCandidate `json:"static_candidates,omitempty" jsonschema:"description=Optional static schema candidates to merge with DocType-derived candidates"`
+	DocType          string            `json:"doctype" jsonschema:"The Frappe DocType to use for candidate generation"`
+	Content          string            `json:"content" jsonschema:"The agent response content to select a schema for"`
+	StaticCandidates []SchemaCandidate `json:"static_candidates,omitempty" jsonschema:"Optional static schema candidates to merge with DocType-derived candidates"`
 }
 
 func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
@@ -86,6 +86,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
+		}
+		if !isDocTypeAllowed(cfg.AllowedDocTypes, docType) {
+			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
 		}
 
 		params := url.Values{}
@@ -116,6 +119,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
 		}
+		if !isDocTypeAllowed(cfg.AllowedDocTypes, docType) {
+			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
+		}
 		name, ok := validateName(args.Name)
 		if !ok {
 			return toolError("invalid_argument", "name is required"), ToolResponse{}, nil
@@ -132,10 +138,13 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_create_record",
 		Description: "Create a new record in Frappe",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args CreateRecordArgs) (*mcp.CallToolResult, ToolResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args CreateRecordArgs) (*mcp.CallToolResult, ToolResponse, error) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
+		}
+		if !isDocTypeAllowed(cfg.AllowedDocTypes, docType) {
+			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
 		}
 		body, err := json.Marshal(args.DocJSON)
 		if err != nil {
@@ -144,6 +153,32 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 
 		res, err := client.Do(ctx, http.MethodPost, escapePathSegment(docType), body)
 		if err != nil {
+			if fErr, ok := err.(*FrappeError); ok && fErr.ExcType == "MandatoryError" && SupportsElicitation(req, "form") {
+				// Fetch metadata to find ALL mandatory fields
+				meta, mErr := getDocTypeMeta(ctx, client, docType)
+				if mErr == nil {
+					dt := metaToFrappeDocType(docType, meta)
+					var missingFields []FrappeField
+					for _, f := range dt.Fields {
+						if f.Reqd {
+							if _, exists := args.DocJSON[f.Fieldname]; !exists {
+								missingFields = append(missingFields)
+								missingFields = append(missingFields, f)
+							}
+						}
+					}
+
+					if len(missingFields) > 0 {
+						builder := &ElicitationBuilder{}
+						elicit := builder.BuildElicitParams(fmt.Sprintf("Mandatory fields missing for %s", docType), missingFields)
+						return &mcp.CallToolResult{
+							Meta:    mcp.Meta{"elicitation": elicit},
+							IsError: true,
+							Content: []mcp.Content{&mcp.TextContent{Text: fErr.Error()}},
+						}, ToolResponse{}, nil
+					}
+				}
+			}
 			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
 		}
 		return nil, ToolResponse{Data: decodeJSONOrString(res)}, nil
@@ -156,6 +191,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
+		}
+		if !isDocTypeAllowed(cfg.AllowedDocTypes, docType) {
+			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
 		}
 		name, ok := validateName(args.Name)
 		if !ok {
@@ -177,7 +215,7 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_delete_record",
 		Description: "Delete an existing record from Frappe with policy checks",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args DeleteRecordArgs) (*mcp.CallToolResult, DeleteResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args DeleteRecordArgs) (*mcp.CallToolResult, DeleteResponse, error) {
 		if !cfg.EnableDelete {
 			return toolError("delete_disabled", "delete tool is disabled; set FRAPPE_MCP_ENABLE_DELETE=true"), DeleteResponse{}, nil
 		}
@@ -203,6 +241,23 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 				return toolError("delete_policy_violation", "production delete requires FRAPPE_MCP_DELETE_APPROVAL_TOKEN config"), DeleteResponse{}, nil
 			}
 			if args.ApprovalToken == "" || args.ApprovalToken != cfg.DeleteApprovalToken {
+				// If client supports elicitation, prompt for the token instead of failing
+				if SupportsElicitation(req, "form") {
+					builder := &ElicitationBuilder{}
+					elicit := builder.BuildElicitParams("Live delete in production requires an approval token.", []FrappeField{
+						{
+							Fieldname: "approval_token",
+							Label:     "Approval Token",
+							Fieldtype: "Password",
+							Reqd:      true,
+						},
+					})
+					return &mcp.CallToolResult{
+						Meta:    mcp.Meta{"elicitation": elicit},
+						IsError: true, // Returning IsError: true with elicitation meta tells the client it's an elicitation request
+						Content: []mcp.Content{&mcp.TextContent{Text: "Approval token required for production delete."}},
+					}, DeleteResponse{}, nil
+				}
 				return toolError("delete_approval_required", "production delete requires a valid approval_token"), DeleteResponse{}, nil
 			}
 		}

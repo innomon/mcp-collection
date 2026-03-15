@@ -31,6 +31,8 @@ This document defines the MCP Resource capability for the Frappe MCP server. Res
 - **MIME Type**: `application/json`
 - **Parameters**: 
     - `name`: The name of the DocType (e.g., `Customer`).
+- **Completion**: Supports autocompletion for the `{name}` parameter based on available DocTypes.
+- **Elicitation**: If `{name}` is missing (e.g., `frappe://doctype/`), the server will trigger a form elicitation to prompt the user for a DocType name selection.
 
 ### `frappe://doctype/{name}/schema`
 - **Description**: Normalized canonical JSON schema for the DocType.
@@ -49,6 +51,18 @@ The server will return the list of static URIs.
 
 ### ListResourceTemplates
 The server will return the template patterns with descriptions.
+
+### Completions (Argument Suggestions)
+The server implements `CompletionHandler` to provide dynamic suggestions for:
+- **Tools**: `doctype` and `name` arguments for Frappe-specific tools.
+- **Resources**: `{name}` parameters in resource templates.
+- **Allowlist Filtering**: All suggestions respect `FRAPPE_ALLOWED_DOCTYPES`.
+
+### Elicitation (Interactive Prompts)
+The server implements interactive elicitation for:
+- **Missing Mandatory Fields**: Prompts for required fields during record creation.
+- **Production Delete Approval**: Prompts for a secret token when deleting in production.
+- **Resource Parameter Selection**: Prompts for DocType name when a template is accessed without parameters.
 
 ### ReadResource
 The server will parse the URI and fetch data from Frappe using the `FrappeClient`.
