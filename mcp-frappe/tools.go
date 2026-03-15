@@ -79,10 +79,29 @@ type SelectSchemaArgs struct {
 }
 
 func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
+	handleError := func(req *mcp.CallToolRequest, err error) (*mcp.CallToolResult, bool) {
+		if fErr, ok := err.(*FrappeError); ok {
+			if (fErr.StatusCode == 401 || fErr.StatusCode == 403) && SupportsElicitation(req, "url") {
+				return &mcp.CallToolResult{
+					Meta: mcp.Meta{
+						"elicitation": map[string]any{
+							"mode":    "url",
+							"message": "Authentication required. Please log in to Frappe.",
+							"url":     fmt.Sprintf("%s/login", strings.TrimRight(cfg.BaseURL, "/")),
+						},
+					},
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "Unauthorized: " + fErr.Error()}},
+				}, true
+			}
+		}
+		return nil, false
+	}
+
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_search",
 		Description: "Search Frappe records with URL-safe filters and fields",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args SearchArgs) (*mcp.CallToolResult, ToolResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args SearchArgs) (*mcp.CallToolResult, ToolResponse, error) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
@@ -106,6 +125,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 
 		res, err := client.Do(ctx, http.MethodGet, path, nil)
 		if err != nil {
+			if res, ok := handleError(req, err); ok {
+				return res, ToolResponse{}, nil
+			}
 			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
 		}
 		return nil, ToolResponse{Data: decodeJSONOrString(res)}, nil
@@ -114,7 +136,7 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_get_record",
 		Description: "Get a specific record's full details",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args GetRecordArgs) (*mcp.CallToolResult, ToolResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args GetRecordArgs) (*mcp.CallToolResult, ToolResponse, error) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
@@ -130,6 +152,45 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 		path := fmt.Sprintf("%s/%s", escapePathSegment(docType), escapePathSegment(name))
 		res, err := client.Do(ctx, http.MethodGet, path, nil)
 		if err != nil {
+			if fErr, ok := err.(*FrappeError); ok && fErr.StatusCode == 404 && SupportsElicitation(req, "form") {
+				// Try to find similar records
+				records, sErr := client.GetRecords(ctx, docType, name)
+				if sErr == nil {
+					options := []string{}
+					if m, ok := records.(map[string]any); ok {
+						if data, ok := m["data"].([]any); ok {
+							for _, item := range data {
+								if row, ok := item.(map[string]any); ok {
+									if n, ok := row["name"].(string); ok {
+										options = append(options, n)
+									}
+								}
+							}
+						}
+					}
+
+					if len(options) > 0 {
+						builder := &ElicitationBuilder{}
+						elicit := builder.BuildElicitParams(fmt.Sprintf("Multiple records found for \"%s\". Please select the correct one.", name), []FrappeField{
+							{
+								Fieldname: "name",
+								Label:     "Record Name",
+								Fieldtype: "Select",
+								Options:   &[]string{strings.Join(options, "\n")}[0],
+								Reqd:      true,
+							},
+						})
+						return &mcp.CallToolResult{
+							Meta:    mcp.Meta{"elicitation": elicit},
+							IsError: true,
+							Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Multiple matches found for %s", name)}},
+						}, ToolResponse{}, nil
+					}
+				}
+			}
+			if res, ok := handleError(req, err); ok {
+				return res, ToolResponse{}, nil
+			}
 			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
 		}
 		return nil, ToolResponse{Data: decodeJSONOrString(res)}, nil
@@ -187,7 +248,7 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_update_record",
 		Description: "Update fields on an existing record",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args UpdateRecordArgs) (*mcp.CallToolResult, ToolResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args UpdateRecordArgs) (*mcp.CallToolResult, ToolResponse, error) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
@@ -207,6 +268,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 		path := fmt.Sprintf("%s/%s", escapePathSegment(docType), escapePathSegment(name))
 		res, err := client.Do(ctx, http.MethodPut, path, body)
 		if err != nil {
+			if res, ok := handleError(req, err); ok {
+				return res, ToolResponse{}, nil
+			}
 			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
 		}
 		return nil, ToolResponse{Data: decodeJSONOrString(res)}, nil
@@ -264,6 +328,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 
 		path := fmt.Sprintf("%s/%s", escapePathSegment(docType), escapePathSegment(name))
 		if _, err := client.Do(ctx, http.MethodDelete, path, nil); err != nil {
+			if res, ok := handleError(req, err); ok {
+				return res, DeleteResponse{}, nil
+			}
 			return toolError("frappe_request_failed", err.Error()), DeleteResponse{}, nil
 		}
 
@@ -273,7 +340,7 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_get_doctype_meta",
 		Description: "Fetch canonical DocType metadata from Frappe",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args DocTypeMetaArgs) (*mcp.CallToolResult, ToolResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocTypeMetaArgs) (*mcp.CallToolResult, ToolResponse, error) {
 		if !cfg.EnableDocTypeGen {
 			return toolError("doctype_generation_disabled", "doctype generation tools are disabled; set FRAPPE_MCP_ENABLE_DOCTYPE_GEN=true"), ToolResponse{}, nil
 		}
@@ -287,6 +354,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 
 		meta, err := getDocTypeMeta(ctx, client, docType)
 		if err != nil {
+			if res, ok := handleError(req, err); ok {
+				return res, ToolResponse{}, nil
+			}
 			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
 		}
 		return nil, ToolResponse{Data: meta}, nil
@@ -295,7 +365,7 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_generate_doctype_json",
 		Description: "Generate canonical DocType JSON for contract version 0.1.0",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args GenerateDocTypeJSONArgs) (*mcp.CallToolResult, DocTypeContractEnvelope, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args GenerateDocTypeJSONArgs) (*mcp.CallToolResult, DocTypeContractEnvelope, error) {
 		if !cfg.EnableDocTypeGen {
 			return toolError("doctype_generation_disabled", "doctype generation tools are disabled; set FRAPPE_MCP_ENABLE_DOCTYPE_GEN=true"), DocTypeContractEnvelope{}, nil
 		}
@@ -313,6 +383,9 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 			var err error
 			rawMeta, err = getDocTypeMeta(ctx, client, docType)
 			if err != nil {
+				if res, ok := handleError(req, err); ok {
+					return res, DocTypeContractEnvelope{}, nil
+				}
 				return toolError("frappe_request_failed", err.Error()), DocTypeContractEnvelope{}, nil
 			}
 		}
@@ -342,26 +415,29 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	dtCache := NewDocTypeCache(time.Duration(cfg.CacheTTLSec) * time.Second)
 	mc := NewMetricsCollector()
 
-	fetchDocType := func(ctx context.Context, docType string) (*FrappeDocType, error) {
+	fetchDocType := func(ctx context.Context, req *mcp.CallToolRequest, docType string) (*FrappeDocType, *mcp.CallToolResult, error) {
 		if dt, ok := dtCache.Get(docType); ok {
 			mc.IncCounter(metricDocTypeCacheHitTotal, nil)
-			return dt, nil
+			return dt, nil, nil
 		}
 		mc.IncCounter(metricDocTypeCacheMissTotal, nil)
 		mc.IncCounter(metricDocTypeFetchTotal, nil)
 		meta, err := getDocTypeMeta(ctx, client, docType)
 		if err != nil {
-			return nil, err
+			if res, ok := handleError(req, err); ok {
+				return nil, res, nil
+			}
+			return nil, nil, err
 		}
 		dt := metaToFrappeDocType(docType, meta)
 		dtCache.Set(docType, dt)
-		return dt, nil
+		return dt, nil, nil
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_map_doctype_to_candidates",
 		Description: "Fetch DocType metadata and return derived A2UI schema candidates",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args MapDocTypeToCandidatesArgs) (*mcp.CallToolResult, ToolResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args MapDocTypeToCandidatesArgs) (*mcp.CallToolResult, ToolResponse, error) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
@@ -370,7 +446,10 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
 		}
 
-		dt, err := fetchDocType(ctx, docType)
+		dt, res, err := fetchDocType(ctx, req, docType)
+		if res != nil {
+			return res, ToolResponse{}, nil
+		}
 		if err != nil {
 			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
 		}
@@ -388,7 +467,7 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "frappe_select_schema",
 		Description: "Run the full A2UI schema selection pipeline: fetch DocType, map candidates, merge with static, select best schema",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args SelectSchemaArgs) (*mcp.CallToolResult, ToolResponse, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args SelectSchemaArgs) (*mcp.CallToolResult, ToolResponse, error) {
 		docType, ok := validateName(args.DocType)
 		if !ok {
 			return toolError("invalid_argument", "doctype is required"), ToolResponse{}, nil
@@ -397,7 +476,10 @@ func registerTools(server *mcp.Server, client *FrappeClient, cfg Config) {
 			return toolError("doctype_not_allowed", "doctype is not allowed by FRAPPE_ALLOWED_DOCTYPES"), ToolResponse{}, nil
 		}
 
-		dt, err := fetchDocType(ctx, docType)
+		dt, res, err := fetchDocType(ctx, req, docType)
+		if res != nil {
+			return res, ToolResponse{}, nil
+		}
 		if err != nil {
 			return toolError("frappe_request_failed", err.Error()), ToolResponse{}, nil
 		}

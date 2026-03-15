@@ -30,17 +30,17 @@ Elicitation allows the `mcp-frappe` server to request missing information (like 
 - [x] **Resource Template**: Update `frappe://doctype/{name}` handler to elicit `{name}` if it's missing or invalid.
 
 ### Phase 3: Validation
-- [ ] Add unit tests in `completions_test.go` (or a new `elicitation_test.go`) to mock Frappe errors and verify the tool returns the correct elicitation metadata.
-- [ ] Verify behavior with an elicitation-capable MCP client (like Claude Desktop or a custom test harness).
+- [x] Add unit tests in `completions_test.go` (or a new `elicitation_test.go`) to mock Frappe errors and verify the tool returns the correct elicitation metadata.
+- [x] Verify behavior with an elicitation-capable MCP client (like Claude Desktop or a custom test harness).
 
 ## 4. Implementation Checklist
 
-- [ ] **SDK Capability Check**:
+- [x] **SDK Capability Check**:
   - Inside tool handler: `if !clientCapabilities.Elicitation.SupportsForm { return error }`
-- [ ] **Form Construction**:
+- [x] **Form Construction**:
   - Extract `fieldname`, `label`, and `fieldtype` from Frappe metadata.
   - Convert Frappe types (Data, Select, Check, etc.) to JSON Schema types (string, boolean, enum).
-- [ ] **State Management**:
+- [x] **State Management**:
   - Ensure the LLM knows it needs to wait for user input (handled by MCP protocol).
-- [ ] **Error Fallback**:
+- [x] **Error Fallback**:
   - Provide a graceful degradation path if the client does not support elicitation.

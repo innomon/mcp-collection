@@ -81,7 +81,8 @@ func registerResources(server *mcp.Server, client *FrappeClient, cfg Config) {
 						},
 					})
 					return &mcp.ReadResourceResult{
-						Meta: mcp.Meta{"elicitation": elicit},
+						Meta:     mcp.Meta{"elicitation": elicit},
+						Contents: []*mcp.ResourceContents{},
 					}, nil
 				}
 				return nil, fmt.Errorf("invalid doctype resource URI: name is missing")
