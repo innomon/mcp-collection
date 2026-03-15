@@ -113,6 +113,26 @@ func (c *FrappeClient) GetSystemInfo(ctx context.Context) (any, error) {
 	return decodeJSONOrString(res), nil
 }
 
+func (c *FrappeClient) GetRecords(ctx context.Context, docType string, prefix string) (any, error) {
+	params := url.Values{}
+	params.Set("fields", "[\"name\"]")
+	if prefix != "" {
+		params.Set("filters", fmt.Sprintf("[[\"name\", \"like\", \"%s%%\"]]", prefix))
+	}
+	params.Set("limit_page_length", "20")
+
+	path := escapePathSegment(docType)
+	if encoded := params.Encode(); encoded != "" {
+		path = path + "?" + encoded
+	}
+
+	res, err := c.Do(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	return decodeJSONOrString(res), nil
+}
+
 func getDocTypeMeta(ctx context.Context, client *FrappeClient, docType string) (map[string]any, error) {
 	path := fmt.Sprintf("DocType/%s", escapePathSegment(docType))
 	res, err := client.Do(ctx, http.MethodGet, path, nil)

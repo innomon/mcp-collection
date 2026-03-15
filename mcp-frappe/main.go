@@ -29,7 +29,12 @@ func main() {
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "frappe-mcp",
 		Version: "1.1.0",
-	}, nil)
+	}, &mcp.ServerOptions{
+		Capabilities: &mcp.ServerCapabilities{
+			Completions: &mcp.CompletionCapabilities{},
+		},
+		CompletionHandler: newCompletionHandler(client, cfg),
+	})
 	registerTools(server, client, cfg)
 	registerResources(server, client, cfg)
 
