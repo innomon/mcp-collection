@@ -4,6 +4,8 @@ mcp2mcpmem
 mcpfrp
 woo-mcp/woo-mcp
 
+# Firebase MCP crap
+firebase-debug.log
 
 # IDE
 .idea/

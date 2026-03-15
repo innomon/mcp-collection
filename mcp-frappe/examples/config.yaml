@@ -1,0 +1,90 @@
+# Frappe MCP Server Configuration Example
+#
+# This file serves as a reference for configuring the Frappe MCP server.
+# Currently, the server reads these values from environment variables.
+# For example, 'base_url' maps to FRAPPE_BASE_URL.
+
+# --- Frappe Connection ---
+
+# The base URL of your Frappe site (e.g., https://erp.example.com)
+# Env: FRAPPE_BASE_URL or FRAPPE_URL
+base_url: "https://your-frappe-instance.com"
+
+# API Key generated from User settings in Frappe
+# Env: FRAPPE_API_KEY
+api_key: "your_api_key_here"
+
+# API Secret generated from User settings in Frappe
+# Env: FRAPPE_API_SECRET
+api_secret: "your_api_secret_here"
+
+# --- Server Settings ---
+
+# MCP Transport to use: 'stdio' or 'sse'
+# Env: FRAPPE_MCP_TRANSPORT (default: "stdio")
+transport: "stdio"
+
+# Request timeout in milliseconds
+# Env: FRAPPE_TIMEOUT_MS (default: 15000)
+timeout_ms: 15000
+
+# Environment name: 'development', 'staging', or 'production'
+# Env: FRAPPE_ENV or APP_ENV
+environment: "development"
+
+# --- SSE Settings (Required only if transport is 'sse') ---
+
+# Host address to bind the SSE server
+# Env: FRAPPE_MCP_SSE_HOST
+sse_host: "localhost"
+
+# Port number to bind the SSE server
+# Env: FRAPPE_MCP_SSE_PORT
+sse_port: "8080"
+
+# Path for the SSE endpoint
+# Env: FRAPPE_MCP_SSE_PATH (default: "/sse")
+sse_path: "/sse"
+
+# --- Feature Flags ---
+
+# Enable record deletion tool (frappe_delete_record)
+# Env: FRAPPE_MCP_ENABLE_DELETE (default: false)
+enable_delete: false
+
+# Enable DocType metadata and contract generation tools
+# Env: FRAPPE_MCP_ENABLE_DOCTYPE_GEN (default: false)
+enable_doctype_gen: true
+
+# Enable A2UI (Agent-to-UI) schema selection pipeline
+# Env: FRAPPE_MCP_ENABLE_A2UI_PIPELINE (default: false)
+enable_a2ui_pipeline: true
+
+# --- Access Control & Security ---
+
+# Comma-separated list of allowed DocTypes (e.g., "Customer,Address,Sales Order")
+# Leave empty to allow all DocTypes
+# Env: FRAPPE_ALLOWED_DOCTYPES
+allowed_doctypes: ""
+
+# Token required for live delete in production environment
+# Env: FRAPPE_MCP_DELETE_APPROVAL_TOKEN
+delete_approval_token: "super-secret-approval-token"
+
+# --- A2UI Pipeline Settings ---
+
+# Minimum confidence threshold for schema selection (0.0 to 1.0)
+# Env: FRAPPE_MCP_CONFIDENCE_THRESHOLD (default: 0.5)
+confidence_threshold: 0.5
+
+# Maximum number of schema candidates to consider per request
+# Env: FRAPPE_MCP_MAX_CANDIDATES (default: 20)
+max_candidates: 20
+
+# Default schema to use if selection confidence is below threshold
+# Env: FRAPPE_MCP_FALLBACK_SCHEMA (default: "markdown")
+fallback_schema: "markdown"
+
+# Cache TTL for DocType metadata in seconds
+# Env: FRAPPE_MCP_CACHE_TTL_SEC (default: 300)
+cache_ttl_sec: 300
