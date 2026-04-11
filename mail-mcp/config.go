@@ -44,6 +44,18 @@ type AuthConfig struct {
 	Password string `yaml:"password"`
 }
 
+func (cfg *Config) GetAccount(id string) (*AccountConfig, error) {
+	if id == "" && len(cfg.Accounts) > 0 {
+		return &cfg.Accounts[0], nil
+	}
+	for _, acc := range cfg.Accounts {
+		if acc.ID == id {
+			return &acc, nil
+		}
+	}
+	return nil, fmt.Errorf("account not found: %s", id)
+}
+
 func LoadConfig(args []string) (*Config, error) {
 	path, err := resolveConfigPath(args)
 	if err != nil {

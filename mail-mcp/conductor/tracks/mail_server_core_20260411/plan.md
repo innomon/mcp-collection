@@ -14,9 +14,9 @@
 
 ## Phase 2: Authentication & Connectivity
 
-- [ ] Create `auth.go` for SASL/OAuth integration
-- [ ] Implement `imap_client.go` to handle IMAP connection and authentication
-- [ ] Implement `smtp_client.go` for SMTP connection handling
+- [x] Create `mail_client.go` to handle IMAP and SMTP connections (logic for `auth.go` merged here for simplicity)
+- [x] Implement `imap_client.go` logic (integrated into `mail_client.go`) to handle IMAP connection and authentication
+- [x] Implement `smtp_client.go` logic (integrated into `mail_client.go`) for SMTP connection handling
 
 ## Phase 3: Reading Tools (IMAP)
 
