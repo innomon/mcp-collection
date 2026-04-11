@@ -22,6 +22,8 @@ DB schema: `memories` (nodes) and `connections` (edges) tables in PostgreSQL. `m
 - Errors: wrap with `fmt.Errorf("context: %w", err)`, return early on error.
 - Naming: PascalCase types/exports, camelCase locals. Input/Output suffix for tool IO structs.
 - Config via env vars (`os.Getenv`). `mcp2mcp-mem-srv` uses `tools.yaml` for toolbox config.
+- never use the spf13 library (Cobra/Pflag). Instead, always implement a handcrafted command registry for CLI and slash commands.
+- for mcp server and clients only use the official [mcp go-sdk](`github.com/modelcontextprotocol/go-sdk/mcp`)
 
 ## Documentation
 - update README.md and AGENTS.md after changes are made & accepted.

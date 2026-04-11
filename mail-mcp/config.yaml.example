@@ -1,0 +1,21 @@
+# mail-mcp example configuration
+
+server:
+  name: "mail-mcp"
+  version: "1.0.0"
+
+accounts:
+  - id: "primary"
+    email: "user@example.com"
+    imap:
+      host: "imap.gmail.com"
+      port: 993
+      tls: true
+    smtp:
+      host: "smtp.gmail.com"
+      port: 587
+      starttls: true
+    auth:
+      type: "app_password" # or "oauth2"
+      user: "user@example.com"
+      password: "your-app-password-here"
