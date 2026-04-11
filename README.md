@@ -69,6 +69,26 @@ WooCommerce MCP+UCP server exposing WooCommerce capabilities via both MCP (for A
 - **Super User Mode**: `super_user: true` enables trusted backend mode; `api_keys` list secures REST endpoints via `Authorization: Bearer <key>` or `X-API-Key` header
 - **Config**: `config.yaml` with `store_url`, `consumer_key`, `consumer_secret`, `transport`, `http_port`, `ucp_enabled`, `a2ui_enabled`, `super_user`, `api_keys`, `oauth_clients`
 
+### mail-mcp
+
+A provider-agnostic MCP server for interacting with email accounts via IMAP and SMTP.
+
+- **Transport**: `stdio` (default)
+- **Features**: 
+  - IMAP (v2) for robust email fetching, mailbox listing, and message management.
+  - SMTP for sending emails with HTML and attachments.
+  - Supports App Passwords, TLS, and STARTTLS.
+- **Core tools**:
+  - `list_folders`: List all mail folders.
+  - `list_messages`: List recent messages in a folder with metadata.
+  - `search_messages`: Search messages by criteria (from, to, subject, body).
+  - `get_message`: Fetch full message content including body and attachments.
+  - `send_email`: Send a new email with support for HTML and attachments.
+  - `reply_to_email`: Reply to an existing email (handles threading).
+  - `mark_as_read`: Mark a message as seen.
+  - `delete_message`: Permanently delete a message.
+- **Config**: `config.yaml` with server settings and account configurations (IMAP/SMTP hosts, ports, auth).
+
 ## Database Schema
 
 Both memory servers use the same PostgreSQL schema:
