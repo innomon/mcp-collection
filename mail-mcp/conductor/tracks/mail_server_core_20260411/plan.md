@@ -20,32 +20,34 @@
 
 ## Phase 3: Reading Tools (IMAP)
 
-- [ ] Implement `list_folders` tool
-- [ ] Implement `list_messages` tool (fetches ENVELOPE)
-- [ ] Implement `get_message` tool
-  - [ ] Use `go-message` to parse MIME parts
-  - [ ] Extract plain text and HTML bodies
-  - [ ] Handle attachment metadata
+- [x] Implement `list_folders` tool
+- [x] Implement `list_messages` tool (fetches ENVELOPE)
+- [x] Implement `get_message` tool
+  - [x] Use `go-message` to parse MIME parts
+  - [x] Extract plain text and HTML bodies
+  - [x] Handle attachment metadata
 
 ## Phase 4: Composition Tools (SMTP)
 
-- [ ] Implement `send_email` tool
-  - [ ] Support plain text and HTML
-  - [ ] Basic attachment support
+- [x] Implement `send_email` tool
+  - [x] Support plain text and HTML
+  - [x] Basic attachment support
+- [x] Implement `reply_to_email` tool (handles In-Reply-To/References)
+
 
 ## Phase 5: Management Tools
 
-- [ ] Implement `mark_as_read` tool
-- [ ] Implement `delete_message` tool (moves to Trash if configured)
+- [x] Implement `mark_as_read` tool
+- [x] Implement `delete_message` tool (moves to Trash if configured - currently does permanent delete with Expunge)
 
 ## Phase 6: Refinement & Testing
 
-- [ ] Comprehensive error handling for connection issues
-- [ ] Sanitize agent inputs for security
-- [ ] Unit tests for config parsing and message mapping
+- [x] Comprehensive error handling for connection issues
+- [x] Sanitize agent inputs for security
+- [x] Unit tests for config parsing and message mapping
 - [ ] End-to-end manual testing with a real email account (e.g., Gmail App Password)
 
 ## Checklist Verification
-- [ ] `go build ./mail-mcp/...` succeeds
-- [ ] `config.yaml.example` is present
-- [ ] `README.md` is updated with usage instructions
+- [x] `go build ./mail-mcp/...` succeeds
+- [x] `config.yaml.example` is present
+- [x] `README.md` is updated with usage instructions
