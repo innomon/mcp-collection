@@ -30,7 +30,7 @@ MCP Frappe server is build-compatible with current SDK, and CRUD capability stat
   - Done: `frappe_search` updated to use `url.Values` for safe encoding.
 - [x] Add transport configuration for `stdio` (terminal) and `sse` (S)
   - Acceptance: `FRAPPE_MCP_TRANSPORT=stdio|sse` selects runtime transport deterministically.
-  - Done: `FRAPPE_MCP_TRANSPORT` env var selects transport; SSE uses `mcp.NewSSEHandler` with configurable host/port/path.
+  - Done: `FRAPPE_MCP_TRANSPORT` env var selects transport; SSE uses `mcp.NewStreamableHTTPHandler` (Streamable HTTP 2025 spec) with configurable host/port/path.
 - [x] Add startup validation for SSE-specific config (S)
   - Acceptance: missing `FRAPPE_MCP_SSE_HOST`/`FRAPPE_MCP_SSE_PORT` fails fast in SSE mode.
   - Done: Startup validates SSE-specific settings when transport is `sse`; graceful shutdown via SIGINT/SIGTERM.

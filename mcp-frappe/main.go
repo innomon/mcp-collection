@@ -63,7 +63,7 @@ func runServer(ctx context.Context, server *mcp.Server, cfg Config) error {
 }
 
 func runSSEServer(ctx context.Context, server *mcp.Server, cfg Config) error {
-	handler := mcp.NewSSEHandler(func(_ *http.Request) *mcp.Server { return server }, nil)
+	handler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return server }, nil)
 	mux := http.NewServeMux()
 	mux.Handle(cfg.SSEPath, handler)
 
