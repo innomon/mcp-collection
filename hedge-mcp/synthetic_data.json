@@ -1,0 +1,44 @@
+{
+  "prices": {
+    "AAPL": [
+      {"t": 1714467600, "o": 170.1, "h": 172.5, "l": 169.8, "c": 171.2, "v": 50000000},
+      {"t": 1714554000, "o": 171.2, "h": 173.8, "l": 170.5, "c": 173.1, "v": 45000000},
+      {"t": 1714640400, "o": 173.1, "h": 175.0, "l": 172.8, "c": 174.5, "v": 48000000}
+    ],
+    "BTC/USD": [
+      {"t": 1714467600, "o": 62000, "h": 64500, "l": 61500, "c": 63800, "v": 1200},
+      {"t": 1714554000, "o": 63800, "h": 65000, "l": 63000, "c": 64200, "v": 1100},
+      {"t": 1714640400, "o": 64200, "h": 66000, "l": 63500, "c": 65500, "v": 1300}
+    ]
+  },
+  "financials": {
+    "AAPL": {
+      "Symbol": "AAPL",
+      "AssetType": "Common Stock",
+      "Name": "Apple Inc",
+      "PERatio": "28.5",
+      "PEGRatio": "2.1",
+      "BookValue": "4.5",
+      "DividendYield": "0.005",
+      "RevenueTTM": "383000000000",
+      "QuarterlyEarningsGrowthYOY": "0.13",
+      "QuarterlyRevenueGrowthYOY": "0.02"
+    }
+  },
+  "news": {
+    "AAPL": [
+      {
+        "headline": "Apple reports record Q2 revenue",
+        "summary": "Apple announced its second quarter financial results, exceeding analyst expectations with strong iPhone sales.",
+        "datetime": 1714467600,
+        "source": "Financial Times"
+      },
+      {
+        "headline": "Rumors of new AI chips from Apple",
+        "summary": "Supply chain reports suggest Apple is accelerating the development of its own AI processors for data centers.",
+        "datetime": 1714554000,
+        "source": "TechCrunch"
+      }
+    ]
+  }
+}
