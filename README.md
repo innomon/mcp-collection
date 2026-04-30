@@ -16,6 +16,32 @@ Knowledge graph memory server over PostgreSQL. Exposes MCP tools for creating, s
 
 Similar memory server variant that uses genai-toolbox + `tools.yaml` for PostgreSQL access via MCP-to-MCP communication.
 
+### hello-mcp
+
+Simple "Hello World" MCP server example.
+
+- **Transports**: `stdio` (default) and `sse`
+- **Core tools**:
+  - `hello` — Say hello to someone (takes an optional `name` argument)
+- **Key env vars**:
+  - `HELLO_MCP_TRANSPORT` (`stdio` or `sse`)
+  - `HELLO_MCP_SSE_HOST`, `HELLO_MCP_SSE_PORT`, `HELLO_MCP_SSE_PATH` (for `sse` mode)
+
+### hedge-mcp
+
+Financial market data and quantitative analysis MCP server.
+
+- **Transports**: `stdio` (default) and `sse`
+- **Core tools**:
+  - `get_prices` — Fetch historical price data (OHLCV) for a given symbol and resolution
+  - `calculate_indicators` — Calculate technical indicators (RSI, MACD, BB, EMA, ATR) from price data
+  - `get_financials` — Fetch key fundamental data and financial ratios for a given stock symbol
+  - `get_news` — Fetch recent news headlines and summaries for a given stock symbol
+- **Simulation Mode**: Can run with `-simulate` flag and `-data` flag (defaults to `synthetic_data.json`) to use local synthetic data instead of live APIs
+- **Key env vars**:
+  - `HEDGE_MCP_TRANSPORT` (`stdio` or `sse`)
+  - `HEDGE_MCP_SSE_HOST`, `HEDGE_MCP_SSE_PORT`, `HEDGE_MCP_SSE_PATH` (for `sse` mode)
+
 ### mcp-frappe
 
 Frappe ERP MCP server with CRUD and DocType contract tooling.
