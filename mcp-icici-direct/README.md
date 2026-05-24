@@ -110,3 +110,5 @@ Verify standard code format:
 ```bash
 go vet ./...
 ```
+# Resource
+[ICICI Direct API documentation](https://api.icicidirect.com/breezeapi/documents/index.html)
