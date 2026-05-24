@@ -22,6 +22,10 @@ The repository is a monorepo containing multiple independent MCP servers. Each s
   - **Transport**: Supports `stdio`, `http`, or `both`.
   - **Key Features**: Legacy MCP tools, UCP-compliant discovery/checkout/order tools, OAuth 2.0 identity linking, and A2UI card rendering.
   - **Configuration**: Managed via `config.yaml`.
+- **mcp-icici-direct**: An ICICI Direct Breeze API trading and research MCP server.
+  - **Transport**: Supports `stdio` and `sse`.
+  - **Key Features**: Live OAuth authentication flow, demat holdings, segment limit allocations, active margin calculations, stock quotes, historical OHLCV chart candles, limit/Stop-Loss order placements, square-offs, and GTT (Good Till Triggered) order management. Includes a robust local dry-run simulation mode.
+
 
 ---
 

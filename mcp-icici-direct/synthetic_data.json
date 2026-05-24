@@ -1,0 +1,174 @@
+{
+  "customer_details": {
+    "exchanged_token": "mock_session_token_998877",
+    "client_id": "ICICID_MOCK_CLIENT_123",
+    "user_name": "Antigravity Trader",
+    "email": "trader@antigravity.ai"
+  },
+  "demat_holdings": [
+    {
+      "stock_code": "ITC",
+      "stock_name": "ITC LIMITED",
+      "isin": "INE154A01025",
+      "quantity": 150,
+      "allocated_quantity": 0,
+      "pledged_quantity": 0,
+      "demat_pending_quantity": 0
+    },
+    {
+      "stock_code": "RELIANCE",
+      "stock_name": "RELIANCE INDUSTRIES LTD",
+      "isin": "INE002A01018",
+      "quantity": 25,
+      "allocated_quantity": 0,
+      "pledged_quantity": 0,
+      "demat_pending_quantity": 0
+    },
+    {
+      "stock_code": "TCS",
+      "stock_name": "TATA CONSULTANCY SERV LT",
+      "isin": "INE467B01029",
+      "quantity": 10,
+      "allocated_quantity": 0,
+      "pledged_quantity": 0,
+      "demat_pending_quantity": 0
+    }
+  ],
+  "funds": {
+    "equity_limit": 50000.0,
+    "equity_allocated": 20000.0,
+    "fno_limit": 100000.0,
+    "fno_allocated": 40000.0,
+    "available_limit": 90000.0
+  },
+  "margins": {
+    "total_margin": 150000.0,
+    "available_margin": 90000.0,
+    "utilized_margin": 60000.0,
+    "blocked_margin": 0.0
+  },
+  "quotes": {
+    "ITC": {
+      "symbol": "ITC",
+      "ltp": 435.25,
+      "open": 431.0,
+      "high": 438.5,
+      "low": 430.1,
+      "close": 431.2,
+      "volume": 8452100,
+      "bid_price": 435.2,
+      "bid_qty": 1500,
+      "ask_price": 435.3,
+      "ask_qty": 2100
+    },
+    "RELIANCE": {
+      "symbol": "RELIANCE",
+      "ltp": 2450.75,
+      "open": 2435.0,
+      "high": 2465.0,
+      "low": 2430.0,
+      "close": 2432.4,
+      "volume": 3215400,
+      "bid_price": 2450.6,
+      "bid_qty": 200,
+      "ask_price": 2450.9,
+      "ask_qty": 350
+    },
+    "TCS": {
+      "symbol": "TCS",
+      "ltp": 3850.15,
+      "open": 3820.0,
+      "high": 3865.0,
+      "low": 3810.0,
+      "close": 3815.5,
+      "volume": 985200,
+      "bid_price": 3850.0,
+      "bid_qty": 50,
+      "ask_price": 3850.3,
+      "ask_qty": 120
+    }
+  },
+  "portfolio_holdings": [
+    {
+      "stock_code": "ITC",
+      "exchange_code": "NSE",
+      "quantity": 150,
+      "average_price": 412.5,
+      "current_price": 435.25,
+      "market_value": 65287.5,
+      "pnl": 3412.5
+    },
+    {
+      "stock_code": "RELIANCE",
+      "exchange_code": "NSE",
+      "quantity": 25,
+      "average_price": 2380.0,
+      "current_price": 2450.75,
+      "market_value": 61268.75,
+      "pnl": 1768.75
+    }
+  ],
+  "portfolio_positions": [
+    {
+      "stock_code": "ITC",
+      "exchange_code": "NSE",
+      "product_type": "intraday",
+      "action": "buy",
+      "quantity": 100,
+      "average_price": 433.0,
+      "ltp": 435.25,
+      "pnl": 225.0,
+      "status": "open"
+    }
+  ],
+  "orders": [
+    {
+      "order_id": "20260523N100021",
+      "stock_code": "ITC",
+      "exchange_code": "NSE",
+      "product": "cash",
+      "action": "buy",
+      "order_type": "limit",
+      "quantity": "50",
+      "price": "432.50",
+      "status": "pending",
+      "validity": "day",
+      "order_date": "2026-05-23 10:14:00"
+    }
+  ],
+  "trades": [
+    {
+      "order_id": "20260523N100010",
+      "stock_code": "RELIANCE",
+      "exchange_code": "NSE",
+      "product": "cash",
+      "action": "buy",
+      "quantity": "10",
+      "price": "2435.00",
+      "trade_id": "TRD998877",
+      "trade_date": "2026-05-23 09:30:15"
+    }
+  ],
+  "gtt_orders": [
+    {
+      "gtt_id": "GTT88776655",
+      "stock_code": "TCS",
+      "exchange_code": "NSE",
+      "product_type": "cash",
+      "action": "buy",
+      "trigger_price": "3750.00",
+      "limit_price": "3755.00",
+      "quantity": "5",
+      "status": "active",
+      "validity_date": "2027-05-23T18:30:00.000Z"
+    }
+  ],
+  "historical_charts": {
+    "ITC_NSE": [
+      {"t": "2026-05-23T09:15:00.000Z", "o": 431.0, "h": 433.5, "l": 430.5, "c": 432.8, "v": 150000},
+      {"t": "2026-05-23T09:16:00.000Z", "o": 432.8, "h": 434.2, "l": 432.0, "c": 433.5, "v": 98000},
+      {"t": "2026-05-23T09:17:00.000Z", "o": 433.5, "h": 435.0, "l": 433.1, "c": 434.9, "v": 125000},
+      {"t": "2026-05-23T09:18:00.000Z", "o": 434.9, "h": 436.0, "l": 434.5, "c": 435.25, "v": 210000}
+    ]
+  }
+}
