@@ -1,0 +1,174 @@
+{
+  "channels": {
+    "UC1234567890": {
+      "id": "UC1234567890",
+      "title": "TechGurus",
+      "description": "The ultimate destination for software engineering tutorials, system design breakdowns, and Go development insights.",
+      "customUrl": "@techgurus",
+      "publishedAt": "2020-01-15T08:00:00Z",
+      "subscriberCount": 142000,
+      "videoCount": 248,
+      "viewCount": 18450000,
+      "uploadsPlaylistId": "UU1234567890"
+    },
+    "UC0987654321": {
+      "id": "UC0987654321",
+      "title": "CookingCorner",
+      "description": "Delicious, easy-to-follow culinary recipes for home cooks of all skill levels.",
+      "customUrl": "@cookingcorner",
+      "publishedAt": "2021-06-20T12:00:00Z",
+      "subscriberCount": 89000,
+      "videoCount": 115,
+      "viewCount": 5920000,
+      "uploadsPlaylistId": "UU0987654321"
+    }
+  },
+  "videos": {
+    "v_go125": {
+      "id": "v_go125",
+      "title": "Go 1.25 Features Deep Dive: Typed Tool Registry & New Routing",
+      "description": "In this video, we explore the brand new Go 1.25 release, covering new standard library routers, generic reflection performance improvements, and how to build production-grade Go servers.",
+      "publishedAt": "2026-05-10T14:00:00Z",
+      "channelId": "UC1234567890",
+      "channelTitle": "TechGurus",
+      "viewCount": 25400,
+      "likeCount": 1820,
+      "commentCount": 142,
+      "duration": "PT14M32S"
+    },
+    "v_sysdesign": {
+      "id": "v_sysdesign",
+      "title": "System Design: Scaling to 10M Concurrent WebSockets",
+      "description": "How do you scale real-time WebSocket connections to millions of concurrent users? Learn architectural patterns, resource limits, and connection state caching in this deep dive.",
+      "publishedAt": "2026-04-22T15:30:00Z",
+      "channelId": "UC1234567890",
+      "channelTitle": "TechGurus",
+      "viewCount": 98700,
+      "likeCount": 6540,
+      "commentCount": 512,
+      "duration": "PT22M15S"
+    },
+    "v_baking": {
+      "id": "v_baking",
+      "title": "Top 10 Sourdough Baking Secrets Exposed",
+      "description": "Unlock perfect oven spring and open crumb with these 10 sourdough secrets used by professional artisan bakers around the world.",
+      "publishedAt": "2026-05-01T09:00:00Z",
+      "channelId": "UC0987654321",
+      "channelTitle": "CookingCorner",
+      "viewCount": 42100,
+      "likeCount": 3100,
+      "commentCount": 289,
+      "duration": "PT18M45S"
+    }
+  },
+  "channel_analytics": {
+    "UC1234567890": [
+      {
+        "date": "2026-05-20",
+        "views": 15400,
+        "watchTimeMinutes": 123200,
+        "subscribersGained": 180,
+        "subscribersLost": 12,
+        "averageViewDurationSeconds": 480
+      },
+      {
+        "date": "2026-05-21",
+        "views": 16200,
+        "watchTimeMinutes": 129600,
+        "subscribersGained": 195,
+        "subscribersLost": 15,
+        "averageViewDurationSeconds": 480
+      },
+      {
+        "date": "2026-05-22",
+        "views": 14900,
+        "watchTimeMinutes": 119200,
+        "subscribersGained": 165,
+        "subscribersLost": 8,
+        "averageViewDurationSeconds": 480
+      },
+      {
+        "date": "2026-05-23",
+        "views": 17100,
+        "watchTimeMinutes": 136800,
+        "subscribersGained": 210,
+        "subscribersLost": 14,
+        "averageViewDurationSeconds": 480
+      },
+      {
+        "date": "2026-05-24",
+        "views": 18500,
+        "watchTimeMinutes": 148000,
+        "subscribersGained": 235,
+        "subscribersLost": 11,
+        "averageViewDurationSeconds": 480
+      }
+    ]
+  },
+  "video_analytics": {
+    "v_go125": [
+      {
+        "date": "2026-05-20",
+        "views": 3200,
+        "watchTimeMinutes": 28800,
+        "likes": 240,
+        "comments": 18,
+        "shares": 45
+      },
+      {
+        "date": "2026-05-21",
+        "views": 3500,
+        "watchTimeMinutes": 31500,
+        "likes": 265,
+        "comments": 22,
+        "shares": 52
+      },
+      {
+        "date": "2026-05-22",
+        "views": 2900,
+        "watchTimeMinutes": 26100,
+        "likes": 210,
+        "comments": 15,
+        "shares": 38
+      }
+    ]
+  },
+  "demographics": {
+    "UC1234567890": [
+      { "ageGroup": "18-24", "gender": "male", "viewerPercentage": 15.5 },
+      { "ageGroup": "18-24", "gender": "female", "viewerPercentage": 4.2 },
+      { "ageGroup": "25-34", "gender": "male", "viewerPercentage": 45.8 },
+      { "ageGroup": "25-34", "gender": "female", "viewerPercentage": 12.3 },
+      { "ageGroup": "35-44", "gender": "male", "viewerPercentage": 14.2 },
+      { "ageGroup": "35-44", "gender": "female", "viewerPercentage": 8.0 }
+    ]
+  },
+  "traffic_sources": {
+    "UC1234567890": [
+      { "sourceType": "YT_SEARCH", "views": 85000, "watchTimeMinutes": 680000 },
+      { "sourceType": "RECOMMENDED", "views": 62000, "watchTimeMinutes": 496000 },
+      { "sourceType": "EXTERNAL", "views": 25000, "watchTimeMinutes": 200000 },
+      { "sourceType": "PLAYLIST", "views": 12500, "watchTimeMinutes": 100000 }
+    ]
+  },
+  "video_comments": {
+    "v_go125": [
+      {
+        "id": "c1",
+        "authorName": "Alice Dev",
+        "authorChannelUrl": "http://youtube.com/channel/UCalice",
+        "textDisplay": "This deep dive on Go 1.25 generics reflection is incredibly timely. Excellent explanations as always!",
+        "likeCount": 42,
+        "publishedAt": "2026-05-10T14:15:00Z"
+      },
+      {
+        "id": "c2",
+        "authorName": "Bob Coder",
+        "authorChannelUrl": "http://youtube.com/channel/UCbob",
+        "textDisplay": "Wait, did Go 1.25 improve the performance of standard json marshalling too?",
+        "likeCount": 18,
+        "publishedAt": "2026-05-10T15:22:00Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+# YouTube and YouTube Analytics MCP Server Config Example
+# Copy this file to config.yaml or set these values as environment variables.
+
+# OAuth 2.0 Credentials from Google Cloud Console
+# Create a project, enable 'YouTube Data API v3' and 'YouTube Analytics API'.
+# Add OAuth 2.0 Client credentials with http://localhost:6050/oauth2/callback as Authorized Redirect URI.
+youtube:
+  client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+  client_secret: "YOUR_GOOGLE_CLIENT_SECRET"
+  
+  # The callback port must match the port specified in the Google Cloud Console redirect URI.
+  port: 6050
+
+  # Location of the cached token file. Defaults to ~/.config/mcp-youtube/token.json
+  token_cache_path: "~/.config/mcp-youtube/token.json"

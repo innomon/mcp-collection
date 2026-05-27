@@ -25,6 +25,9 @@ The repository is a monorepo containing multiple independent MCP servers. Each s
 - **mcp-icici-direct**: An ICICI Direct Breeze API trading and research MCP server.
   - **Transport**: Supports `stdio` and `sse`.
   - **Key Features**: Live OAuth authentication flow, demat holdings, segment limit allocations, active margin calculations, stock quotes, historical OHLCV chart candles, limit/Stop-Loss order placements, square-offs, and GTT (Good Till Triggered) order management. Includes a robust local dry-run simulation mode.
+- **mcp-youtube**: A YouTube Data and YouTube Analytics MCP server.
+  - **Transport**: Supports `stdio`.
+  - **Key Features**: Comprehensive read-only tools for searching and fetching channel/video details and comments, alongside aggregate reports for channel performance, demographics, and traffic sources. Includes robust local dry-run simulation and configurable Google OAuth 2.0 dynamic loopback callback (defaulting to port `6050`).
 
 
 ---
